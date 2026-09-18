@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>클린벤치·CO2인큐베이터 실전 게임 (프로토타입)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #0b1210;
+    color: #e7eeeb;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 20px auto;
+    padding: 0 10px 30px;
+  }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
+  #gameWrap {
+    position: relative;
+    width: 900px;
+    max-width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #2a3b35;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.4);
+  }
+  #numInput {
+    position: absolute;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+    font-size: 16px;
+    background: #0e1815;
+    color: #e7eeeb;
+    border: 1.5px solid #35473f;
+    border-radius: 6px;
+    padding: 0 8px;
+    outline: none;
+  }
+  #numInput:focus { border-color: #4fbfae; }
+  .note { margin-top: 14px; font-size: 12px; color: #6b7d76; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧬 클린벤치·CO2인큐베이터 실전 게임 — 프로토타입</h1>
+  <p class="sub">클린벤치(생물안전작업대)에서의 무균 조작과 CO2 인큐베이터의 배양 환경 관리를, 실제 세포 계대배양(Subculture/Passage) SOP 흐름으로 이어서 체험합니다. UV 살균·송풍 안정화부터 물품 소독, 계대 시점 판단, 트립신 처리 타이밍, 분주량 계산, 배양 조건 설정까지 실제 절차에서 결과를 좌우하는 지점을 반영했습니다.</p>
+  <div id="gameWrap">
+    <div id="game"></div>
+    <input id="numInput" type="number" step="0.1" placeholder="">
+  </div>
+  <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 코팅·배지 조성 등은 사전 준비된 상태로 가정했고, 실제 UV 살균·기류 안정화·트립신 처리 시간은 이 게임에서 학습 목적으로 압축했습니다.</p>
+</div>
+
+<script>
+(function () {
+  var W = 900, H = 700;
+
+  var COLORS = {
+    bg: 0x0b1210,
+    panel: 0x14201c,
+    line: 0x2a3b35,
+    lineActive: 0x4fbfae,
+    text: 0xe7eeeb,
+    textMuted: 0x93a69f,
+    ok: 0x4fbfae,
+    bad: 0xe0735f,
+    warn: 0xd9b564,
+    liquid: 0x3fa9f5
+  };
+
+  // ---- layout ----
+  var BENCH = { x: 40, y: 170, w: 380, h: 230 };
+  var INCU = { x: 460, y: 170, w: 170, h: 230 };
+  var SLOT_X = [110, 190, 270, 350];
+  var SLOT_Y = 360;
+  var TRAY_Y = 430;
+
+  var UV_RECOMMENDED_MS = 3000;
+  var BLOWER_RECOMMENDED_MS = 2000;
+  var TRYPSIN_MIN_MS = 1500;
+  var TRYPSIN_IDEAL_MAX_MS = 3200;
+  var TRYPSIN_AUTOCAP_MS = 4500;
+  var CONFLUENCY_POOL = [40, 55, 72, 85, 95];
+  var SPLIT_RATIO_POOL = [4, 6, 8];
+  var TOTAL_SUSPENSION_ML = 6.0;
+  var TEMP_WRONG_POOL = [35, 36, 38, 39];
+  var CO2_WRONG_POOL = [3, 4, 6, 7];
+  var TARGET_TEMP = 37, TARGET_CO2 = 5;
+
+  var ITEMS = [
+    { id: 'media', label: '신선 배지', trayX: SLOT_X[0], slotIdx: 0 },
+    { id: 'pipette', label: '멸균\n피펫', trayX: SLOT_X[1], slotIdx: 1 },
+    { id: 'flask', label: '새\n배양플라스크', trayX: SLOT_X[2], slotIdx: 2 },
+    { id: 'trypsin', label: '트립신\n-EDTA', trayX: SLOT_X[3], slotIdx: 3 }
+  ];
+
+  var config = {
+    type: Phaser.AUTO,
+    width: W, height: H,
+    backgroundColor: '#0b1210',
+    parent: 'game',
+    scene: { create: create, update: update }
+  };
+
+  var state = {
+    step: 1,
+    uvOn: false, uvElapsed: 0, uvDone: false,
+    blowerOn: false, blowerElapsed: 0, blowerDone: false,
+    disinfected: { media: false, pipette: false, flask: false, trypsin: false },
+    placed: { media: false, pipette: false, flask: false, trypsin: false },
+    doorOpen: false,
+    confluency: CONFLUENCY_POOL[Math.floor(Math.random() * CONFLUENCY_POOL.length)],
+    passageDecided: false,
+    mediaRemoved: false,
+    pbsWashCount: 0,
+    trypsinActive: false, trypsinElapsed: 0, trypsinDone: false,
+    splitRatio: SPLIT_RATIO_POOL[Math.floor(Math.random() * SPLIT_RATIO_POOL.length)],
+    volumeConfirmed: false,
+    tempShown: TEMP_WRONG_POOL[Math.floor(Math.random() * TEMP_WRONG_POOL.length)],
+    co2Shown: CO2_WRONG_POOL[Math.floor(Math.random() * CO2_WRONG_POOL.length)],
+    tempOk: false,
+    co2Ok: false,
+    labeled: false,
+    mistakes: 0,
+    issues: [],
+    done: false
+  };
+  state.correctVolume = TOTAL_SUSPENSION_ML / state.splitRatio;
+
+  var refs = { groups: {}, itemObjs: {} };
+
+  new Phaser.Game(config);
+
+  function pushIssue(text) {
+    if (state.issues.indexOf(text) === -1) state.issues.push(text);
+  }
+
+  function create() {
+    var scene = this;
+    refs.scene = scene;
+
+    refs.stepText = scene.add.text(20, 16, '', { fontSize: '15px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.hintText = scene.add.text(20, 40, '', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 610 } });
+    refs.feedbackText = scene.add.text(20, H - 56, '', { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 620 } });
+    refs.scoreText = scene.add.text(W - 20, 16, '', { fontSize: '12px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(1, 0);
+
+    // ---- clean bench ----
+    scene.add.rectangle(BENCH.x + BENCH.w / 2, BENCH.y + BENCH.h / 2, BENCH.w, BENCH.h, 0x1c2d27, 0.5).setStrokeStyle(1.5, 0x2a3b35);
+    scene.add.text(BENCH.x + BENCH.w / 2, BENCH.y - 16, '클린벤치 (Biological Safety Cabinet)', { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+
+    refs.uvGfx = scene.add.graphics();
+    scene.add.text(BENCH.x + 40, BENCH.y + 48, 'UV', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+    refs.blowerGfx = scene.add.graphics();
+    scene.add.text(BENCH.x + BENCH.w - 40, BENCH.y + 48, '송풍', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+    refs.benchSurface = scene.add.rectangle(BENCH.x + BENCH.w / 2, BENCH.y + 160, BENCH.w - 40, 3, 0x35473f);
+    drawUv(); drawBlower();
+
+    // ---- incubator ----
+    scene.add.rectangle(INCU.x + INCU.w / 2, INCU.y + INCU.h / 2, INCU.w, INCU.h, 0x14201c, 1).setStrokeStyle(1.5, 0x2a3b35);
+    scene.add.text(INCU.x + INCU.w / 2, INCU.y - 16, 'CO2 인큐베이터', { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+    refs.incuDisplay = scene.add.text(INCU.x + INCU.w / 2, INCU.y + 22, '', { fontSize: '13px', fontFamily: 'sans-serif', color: '#3fa9f5', fontStyle: 'bold' }).setOrigin(0.5);
+    refs.incuDoorGfx = scene.add.graphics();
+    refs.flaskGfx = scene.add.graphics();
+    refs.confluencyText = scene.add.text(INCU.x + INCU.w / 2, INCU.y + 190, '', { fontSize: '11px', fontFamily: 'sans-serif', color: '#d9b564' }).setOrigin(0.5);
+    updateIncuDisplay();
+    drawIncuDoor();
+
+    // ---- items (drag) ----
+    ITEMS.forEach(function (def) {
+      var g = scene.add.graphics();
+      var label = scene.add.text(0, 0, def.label, { fontSize: '9.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center' }).setOrigin(0.5);
+      var chip = scene.add.text(0, 0, '', { fontSize: '9px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' }).setOrigin(0.5);
+      var obj = { def: def, x: def.trayX, y: TRAY_Y, gfx: g, label: label, chip: chip, placed: false };
+      refs.itemObjs[def.id] = obj;
+      drawItem(obj);
+
+      var hit = new Phaser.Geom.Rectangle(-20, -22, 40, 44);
+      g.setInteractive(hit, Phaser.Geom.Rectangle.Contains);
+      scene.input.setDraggable(g);
+      // Disinfecting uses a separate interactive target (the status chip) from the drag
+      // handle (the item graphic itself) — sharing one target for both a click-to-toggle
+      // action and a drag gesture is ambiguous, since every drag also starts with a
+      // pointerdown on the same object, which would silently re-toggle disinfect status
+      // right as the user picks the item up to move it.
+      chip.setInteractive(new Phaser.Geom.Rectangle(-30, -8, 60, 16), Phaser.Geom.Rectangle.Contains);
+      chip.on('pointerdown', function () { toggleDisinfect(obj); });
+      g.on('drag', function (pointer, dragX, dragY) {
+        obj.x = Phaser.Math.Clamp(dragX, 60, W - 40);
+        obj.y = Phaser.Math.Clamp(dragY, 130, H - 20);
+        drawItem(obj);
+      });
+      g.on('dragend', function () { settleItem(obj); });
+    });
+
+    // ---- control panel ----
+    scene.add.rectangle(660, 120, 220, 560, 0x14201c, 1).setOrigin(0, 0).setStrokeStyle(1, 0x2a3b35);
+    scene.add.text(672, 130, '조작 패널', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+
+    buildUvGroup(scene);
+    buildItemsGroup(scene);
+    buildDoorGroup(scene);
+    buildAsepticGroup(scene);
+    buildVolumeGroup(scene);
+    buildIncuSetGroup(scene);
+    buildLabelGroup(scene);
+
+    scene.add.text(672, 606, '단계 순서', { fontSize: '11px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+    refs.stepListText = scene.add.text(672, 624, '', { fontSize: '9px', fontFamily: 'sans-serif', color: '#6b7d76', lineSpacing: 2 });
+
+    hideInput();
+    setStep(1);
+    updateScore();
+  }
+
+  // ---------- DOM numeric input ----------
+  function positionInput(x, y, w, h, placeholder) {
+    var input = document.getElementById('numInput');
+    input.style.left = x + 'px'; input.style.top = y + 'px';
+    input.style.width = w + 'px'; input.style.height = h + 'px';
+    input.placeholder = placeholder || '';
+    input.value = '';
+    input.focus();
+  }
+  function hideInput() { document.getElementById('numInput').style.left = '-9999px'; }
+
+  // ---------- drawing helpers ----------
+  function drawUv() {
+    var g = refs.uvGfx;
+    g.clear();
+    g.fillStyle(state.uvOn ? 0x9b59ff : 0x2a3b35, 1);
+    g.fillCircle(BENCH.x + 40, BENCH.y + 30, 10);
+    if (state.uvOn) { g.lineStyle(2, 0x9b59ff, 0.35); g.strokeCircle(BENCH.x + 40, BENCH.y + 30, 16); }
+  }
+  function drawBlower() {
+    var g = refs.blowerGfx;
+    g.clear();
+    g.fillStyle(state.blowerOn ? 0x3fa9f5 : 0x2a3b35, 1);
+    g.fillCircle(BENCH.x + BENCH.w - 40, BENCH.y + 30, 10);
+    if (state.blowerOn) { g.lineStyle(2, 0x3fa9f5, 0.35); g.strokeCircle(BENCH.x + BENCH.w - 40, BENCH.y + 30, 16); }
+  }
+  function updateIncuDisplay() {
+    refs.incuDisplay.setText(state.tempShown + '°C / ' + state.co2Shown + '% CO2');
+    refs.incuDisplay.setColor((state.tempOk && state.co2Ok) ? '#4fbfae' : '#3fa9f5');
+  }
+  function drawIncuDoor() {
+    var g = refs.incuDoorGfx;
+    g.clear();
+    if (!state.doorOpen) {
+      g.fillStyle(0x1c2d27, 1);
+      g.fillRect(INCU.x + 10, INCU.y + 55, INCU.w - 20, INCU.h - 90);
+      g.lineStyle(1, 0x35473f, 1);
+      g.strokeRect(INCU.x + 10, INCU.y + 55, INCU.w - 20, INCU.h - 90);
+    }
+    drawFlaskInIncu();
+  }
+  function drawFlaskInIncu() {
+    var g = refs.flaskGfx;
+    g.clear();
+    refs.confluencyText.setText('');
+    if (!state.doorOpen) return;
+    var cx = INCU.x + INCU.w / 2, cy = INCU.y + 120;
+    g.fillStyle(0xcfd8d4, 0.5);
+    g.fillRoundedRect(cx - 55, cy - 22, 110, 44, 5);
+    g.lineStyle(1.5, 0x8a9a94, 1);
+    g.strokeRoundedRect(cx - 55, cy - 22, 110, 44, 5);
+    // confluency dot grid
+    var pct = state.confluency;
+    var cols = 10, rows = 3;
+    var total = cols * rows;
+    var filled = Math.round(total * pct / 100);
+    var k = 0;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var dx = cx - 48 + c * 10.5, dy = cy - 12 + r * 12;
+        g.fillStyle(k < filled ? 0x4fbfae : 0x35473f, 1);
+        g.fillCircle(dx, dy, 3);
+        k++;
+      }
+    }
+    refs.confluencyText.setText('컨플루언시 약 ' + pct + '%');
+  }
+  function drawItem(obj) {
+    var g = obj.gfx;
+    g.clear();
+    if (obj.placed) {
+      g.setVisible(false); obj.label.setVisible(false); obj.chip.setVisible(false);
+      g.disableInteractive(); obj.chip.disableInteractive();
+      return;
+    }
+    g.setPosition(obj.x, obj.y);
+    g.fillStyle(0xcfd8d4, 1);
+    g.fillRoundedRect(-18, -20, 36, 40, 6);
+    g.lineStyle(1.5, state.disinfected[obj.def.id] ? 0x4fbfae : 0x8a9a94, 1);
+    g.strokeRoundedRect(-18, -20, 36, 40, 6);
+    obj.label.setPosition(obj.x, obj.y - 32);
+    // Kept clearly above the item's drag hitbox (which spans roughly y-22..y+22) so the
+    // chip's own hit area never overlaps the drag handle's — see the setInteractive call
+    // above for why that overlap previously swallowed the drag gesture entirely.
+    obj.chip.setPosition(obj.x, obj.y - 48);
+    obj.chip.setText(state.disinfected[obj.def.id] ? '✓ 소독됨' : '클릭:소독');
+  }
+
+  function makeButton(scene, x, y, w, h, label, onClick) {
+    var g = scene.add.graphics();
+    g.fillStyle(0x1c2d27, 1);
+    g.fillRoundedRect(0, 0, w, h, 6);
+    g.lineStyle(1.5, 0x35473f, 1);
+    g.strokeRoundedRect(0, 0, w, h, 6);
+    g.setPosition(x, y);
+    var t = scene.add.text(x + w / 2, y + h / 2, label, { fontSize: '11px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center', wordWrap: { width: w - 8 } }).setOrigin(0.5);
+    var zone = scene.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', function () { onClick(); });
+    return { g: g, t: t, zone: zone };
+  }
+  function setButtonVisible(btn, v) {
+    btn.g.setVisible(v); btn.t.setVisible(v);
+    if (v) { btn.zone.setInteractive({ useHandCursor: true }); } else { btn.zone.disableInteractive(); }
+  }
+  function showOnlyGroup(name) {
+    Object.keys(refs.groups).forEach(function (key) {
+      var visible = key === name;
+      refs.groups[key].forEach(function (obj) {
+        if (obj.g && obj.t && obj.zone) { setButtonVisible(obj, visible); }
+        else if (obj.setVisible) { obj.setVisible(visible); }
+      });
+    });
+  }
+
+  // ---------- STEP 1: UV + blower ----------
+  function buildUvGroup(scene) {
+    var items = [];
+    items.push(scene.add.text(672, 158, 'UV 살균', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' }));
+    refs.uvBtn = makeButton(scene, 672, 176, 195, 32, 'UV 살균 시작', startUv); items.push(refs.uvBtn);
+    refs.uvNextBtn = makeButton(scene, 672, 214, 195, 30, '다음 (송풍 켜기)', finishUv); items.push(refs.uvNextBtn);
+    items.push(scene.add.text(672, 258, '송풍(에어플로우) 안정화', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } }));
+    refs.blowerBtn = makeButton(scene, 672, 288, 195, 32, '송풍 켜기', startBlower); items.push(refs.blowerBtn);
+    refs.blowerNextBtn = makeButton(scene, 672, 326, 195, 30, '다음 (물품 반입)', finishBlower); items.push(refs.blowerNextBtn);
+    refs.groups['uv'] = items;
+  }
+  function startUv() {
+    if (state.step !== 1 || state.uvDone) return;
+    state.uvOn = true; state.uvElapsed = 0;
+    drawUv();
+    showFeedback('UV 램프를 켰습니다. 최소 권장 시간(약 15분) 동안 유지한 뒤 넘어가세요.', true);
+  }
+  function finishUv() {
+    if (state.step !== 1 || state.uvDone) return;
+    if (!state.uvOn) { showFeedback('먼저 UV 살균을 시작하세요.', false); return; }
+    if (state.uvElapsed < UV_RECOMMENDED_MS) {
+      state.mistakes++; updateScore();
+      pushIssue('UV 살균 시간 부족');
+      showFeedback('UV 살균 시간이 권장 시간보다 부족합니다 — 표면 미생물이 충분히 제거되지 않았을 수 있습니다. 그래도 다음으로 진행합니다.', false);
+    } else {
+      showFeedback('UV 살균이 충분히 이루어졌습니다.', true);
+    }
+    state.uvOn = false; state.uvDone = true;
+    drawUv();
+  }
+  function startBlower() {
+    if (state.step !== 1 || !state.uvDone || state.blowerDone) return;
+    state.blowerOn = true; state.blowerElapsed = 0;
+    drawBlower();
+    showFeedback('송풍(에어플로우)을 켰습니다. 층류가 안정될 때까지(약 5~10분) 대기한 뒤 넘어가세요.', true);
+  }
+  function finishBlower() {
+    if (state.step !== 1 || !state.uvDone || state.blowerDone) return;
+    if (!state.blowerOn) { showFeedback('먼저 송풍을 켜세요.', false); return; }
+    if (state.blowerElapsed < BLOWER_RECOMMENDED_MS) {
+      state.mistakes++; updateScore();
+      pushIssue('기류 안정화 시간 부족');
+      showFeedback('기류가 충분히 안정되기 전입니다 — 층류가 형성되기 전 조작하면 오염 위험이 있습니다. 그래도 다음으로 진행합니다.', false);
+    } else {
+      showFeedback('기류가 안정되었습니다. 이제 물품을 소독한 뒤 반입하세요.', true);
+    }
+    state.blowerOn = false; state.blowerDone = true;
+    drawBlower();
+    setStep(2);
+  }
+
+  // ---------- STEP 2: disinfect + bring in items ----------
+  function buildItemsGroup(scene) {
+    var items = [];
+    items.push(scene.add.text(672, 158, '물품 소독·반입', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } }));
+    items.push(scene.add.text(672, 178, '왼쪽 물품을 클릭하면 70% 에탄올로 소독됩니다. 소독 후 클린벤치 작업대 안으로 드래그하세요.', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76', wordWrap: { width: 195 } }));
+    refs.itemsProgressText = scene.add.text(672, 260, '0 / 4 반입 완료', { fontSize: '16px', fontFamily: 'sans-serif', color: '#d9b564', fontStyle: 'bold' });
+    items.push(refs.itemsProgressText);
+    refs.groups['items'] = items;
+  }
+  function toggleDisinfect(obj) {
+    if (state.step !== 2 || obj.placed) return;
+    state.disinfected[obj.def.id] = !state.disinfected[obj.def.id];
+    drawItem(obj);
+  }
+  function computeSlot(x, y) {
+    if (y < BENCH.y + 20 || y > BENCH.y + BENCH.h) return null;
+    for (var i = 0; i < SLOT_X.length; i++) {
+      if (Math.abs(x - SLOT_X[i]) < 40) return i;
+    }
+    return null;
+  }
+  function settleItem(obj) {
+    if (state.step !== 2) { obj.x = obj.def.trayX; obj.y = TRAY_Y; drawItem(obj); return; }
+    var slot = computeSlot(obj.x, obj.y);
+    if (slot === null) { obj.x = obj.def.trayX; obj.y = TRAY_Y; drawItem(obj); return; }
+    if (!state.disinfected[obj.def.id]) {
+      state.mistakes++; updateScore();
+      pushIssue('소독하지 않은 물품 반입 시도');
+      showFeedback(obj.def.label.replace('\n', ' ') + '을(를) 소독하지 않고 반입하려 했습니다 — 오염 위험이 있습니다. 먼저 클릭해서 소독하세요.', false);
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawItem(obj);
+      return;
+    }
+    state.placed[obj.def.id] = true;
+    obj.placed = true;
+    obj.x = SLOT_X[slot]; obj.y = SLOT_Y;
+    drawItem(obj);
+    var count = Object.keys(state.placed).filter(function (k) { return state.placed[k]; }).length;
+    refs.itemsProgressText.setText(count + ' / 4 반입 완료');
+    showFeedback(obj.def.label.replace('\n', ' ') + '을(를) 소독 후 클린벤치 안으로 반입했습니다.', true);
+    if (count === 4) {
+      showFeedback('모든 물품을 무균적으로 반입했습니다. 이제 인큐베이터에서 배양 플라스크를 확인하세요.', true);
+      setStep(3);
+    }
+  }
+
+  // ---------- STEP 3: incubator door + confluency judgement ----------
+  function buildDoorGroup(scene) {
+    var items = [];
+    items.push(scene.add.text(672, 158, '배양 플라스크 확인', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } }));
+    refs.doorBtn = makeButton(scene, 672, 180, 195, 32, '인큐베이터 문 열기', openDoor); items.push(refs.doorBtn);
+    items.push(scene.add.text(672, 232, '컨플루언시(세포 밀도)를 확인하고 판단하세요 (이상적 계대 시점: 70~90%).', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76', wordWrap: { width: 195 } }));
+    refs.passageBtn = makeButton(scene, 672, 288, 195, 32, '지금 계대 진행', function () { decidePassage('passage'); }); items.push(refs.passageBtn);
+    refs.waitBtn = makeButton(scene, 672, 326, 195, 32, '며칠 더 배양 (보류)', function () { decidePassage('wait'); }); items.push(refs.waitBtn);
+    refs.groups['door'] = items;
+  }
+  function openDoor() {
+    if (state.step !== 3 || state.doorOpen) return;
+    state.doorOpen = true;
+    drawIncuDoor();
+    showFeedback('인큐베이터 문을 열었습니다. 배양 플라스크의 컨플루언시를 확인하세요.', true);
+  }
+  function decidePassage(choice) {
+    if (state.step !== 3 || !state.doorOpen || state.passageDecided) return;
+    state.passageDecided = true;
+    var ideal = state.confluency >= 70 && state.confluency <= 90;
+    var correct = (ideal && choice === 'passage') || (!ideal && choice === 'wait');
+    if (!correct) {
+      state.mistakes++; updateScore();
+      pushIssue('계대 시점 판단 오류(컨플루언시 ' + state.confluency + '%)');
+      if (ideal) {
+        showFeedback('컨플루언시 ' + state.confluency + '%는 계대에 적절한 시점이었습니다 — 지금 진행하는 편이 좋습니다. 이번 실습은 계속 진행합니다.', false);
+      } else if (state.confluency < 70) {
+        showFeedback('컨플루언시 ' + state.confluency + '%는 아직 낮은 편입니다 — 지금 계대하면 세포 손실이 클 수 있습니다. 이번 실습은 계속 진행합니다.', false);
+      } else {
+        showFeedback('컨플루언시 ' + state.confluency + '%는 과밀 상태입니다 — 접촉저해·분화 위험이 있어 더 일찍 계대했어야 합니다. 이번 실습은 계속 진행합니다.', false);
+      }
+    } else {
+      showFeedback('컨플루언시 ' + state.confluency + '%에 대한 판단이 적절합니다. 계대를 진행합니다.', true);
+    }
+    setStep(4);
+  }
+
+  // ---------- STEP 4: media removal / PBS wash / trypsin timing ----------
+  function buildAsepticGroup(scene) {
+    var items = [];
+    refs.mediaBtn = makeButton(scene, 672, 158, 195, 30, '기존 배지 제거', removeMedia); items.push(refs.mediaBtn);
+    items.push(scene.add.text(672, 200, 'PBS 세척', { fontSize: '11px', fontFamily: 'sans-serif', color: '#93a69f' }));
+    refs.pbsCountText = scene.add.text(672, 218, '0 회', { fontSize: '15px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    items.push(refs.pbsCountText);
+    refs.pbsBtn = makeButton(scene, 672, 244, 92, 28, 'PBS 세척', doPbsWash); items.push(refs.pbsBtn);
+    refs.pbsNextBtn = makeButton(scene, 770, 244, 96, 28, '다음(트립신)', finishPbs); items.push(refs.pbsNextBtn);
+    items.push(scene.add.text(672, 288, '트립신-EDTA 처리', { fontSize: '11px', fontFamily: 'sans-serif', color: '#93a69f' }));
+    refs.trypsinStartBtn = makeButton(scene, 672, 308, 195, 30, '트립신 처리 시작', startTrypsin); items.push(refs.trypsinStartBtn);
+    refs.trypsinTimeText = scene.add.text(672, 348, '', { fontSize: '18px', fontFamily: 'sans-serif', color: '#d9b564', fontStyle: 'bold' });
+    items.push(refs.trypsinTimeText);
+    refs.neutralizeBtn = makeButton(scene, 672, 374, 195, 32, '신선 배지로 중화', neutralizeTrypsin); items.push(refs.neutralizeBtn);
+    refs.groups['aseptic'] = items;
+  }
+  function removeMedia() {
+    if (state.step !== 4 || state.mediaRemoved) return;
+    state.mediaRemoved = true;
+    showFeedback('기존 배지를 제거했습니다. PBS로 세척하세요.', true);
+  }
+  function doPbsWash() {
+    if (state.step !== 4 || !state.mediaRemoved) return;
+    state.pbsWashCount++;
+    refs.pbsCountText.setText(state.pbsWashCount + ' 회');
+    showFeedback('PBS 세척 완료 (' + state.pbsWashCount + '회) — 잔여 혈청 성분을 씻어내는 중입니다(혈청은 트립신 작용을 저해합니다).', true);
+  }
+  function finishPbs() {
+    if (state.step !== 4 || !state.mediaRemoved) return;
+    if (state.pbsWashCount === 0) {
+      state.mistakes++; updateScore();
+      pushIssue('PBS 세척 없이 진행');
+      showFeedback('PBS 세척 없이 진행했습니다 — 잔여 혈청이 트립신 작용을 방해해 세포가 잘 떨어지지 않을 수 있습니다. 그래도 다음으로 진행합니다.', false);
+    } else {
+      showFeedback('세척이 충분히 이루어졌습니다. 트립신-EDTA를 처리하세요.', true);
+    }
+  }
+  function startTrypsin() {
+    if (state.step !== 4 || !state.mediaRemoved || state.trypsinActive || state.trypsinDone) return;
+    state.trypsinActive = true; state.trypsinElapsed = 0;
+    showFeedback('트립신-EDTA를 추가했습니다 — 세포가 바닥에서 떨어지는 것을 지켜보다 적절한 시점에 "신선 배지로 중화"를 누르세요.', true);
+  }
+  function neutralizeTrypsin(auto) {
+    if (state.step !== 4 || !state.trypsinActive || state.trypsinDone) return;
+    state.trypsinActive = false; state.trypsinDone = true;
+    if (auto === true) {
+      state.mistakes += 2; updateScore();
+      pushIssue('트립신 처리 시간 초과(과처리)');
+      showFeedback('중화 시점을 놓쳐 트립신 처리가 과도하게 길어졌습니다 — 세포 표면 단백질 손상 위험이 큽니다.', false);
+    } else if (state.trypsinElapsed < TRYPSIN_MIN_MS) {
+      state.mistakes++; updateScore();
+      pushIssue('트립신 처리 시간 부족(미해리)');
+      showFeedback('트립신 처리 시간이 짧습니다 — 세포가 충분히 떨어지지 않았을 수 있습니다(미해리).', false);
+    } else if (state.trypsinElapsed > TRYPSIN_IDEAL_MAX_MS) {
+      state.mistakes++; updateScore();
+      pushIssue('트립신 처리 다소 과함');
+      showFeedback('트립신 처리 시간이 다소 깁니다 — 세포 손상 위험이 있습니다.', false);
+    } else {
+      showFeedback('적절한 시점에 신선 배지로 중화했습니다. 세포 현탁액을 새 플라스크에 분주하세요.', true);
+    }
+    setStep(5);
+  }
+
+  // ---------- STEP 5: dilution / volume ----------
+  function buildVolumeGroup(scene) {
+    var items = [];
+    refs.splitInfoText = scene.add.text(672, 158, '', { fontSize: '11px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } });
+    items.push(refs.splitInfoText);
+    items.push(scene.add.text(672, 236, '새 플라스크에 옮길 현탁액 양 (mL)', { fontSize: '10.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } }));
+    refs.volumeConfirmBtn = makeButton(scene, 672, 280, 195, 32, '확인', confirmVolume); items.push(refs.volumeConfirmBtn);
+    refs.groups['volume'] = items;
+  }
+  function confirmVolume() {
+    if (state.step !== 5 || state.volumeConfirmed) return;
+    var input = document.getElementById('numInput');
+    var v = parseFloat(input.value);
+    if (isNaN(v) || input.value === '') { showFeedback('옮길 현탁액 양을 입력하세요 (mL).', false); return; }
+    if (Math.abs(v - state.correctVolume) <= 0.05) {
+      state.volumeConfirmed = true;
+      showFeedback(v + ' mL로 분주 완료 — 1:' + state.splitRatio + ' 분할비에 맞는 정확한 양입니다.', true);
+      hideInput();
+      setStep(6);
+    } else {
+      state.mistakes++; updateScore();
+      pushIssue('분주량 계산 오류');
+      showFeedback(v + ' mL은 1:' + state.splitRatio + ' 분할비 계산과 맞지 않습니다. 다시 계산해 입력하세요. (힌트: 총 ' + TOTAL_SUSPENSION_ML + 'mL ÷ ' + state.splitRatio + ')', false);
+    }
+  }
+
+  // ---------- STEP 6: incubator settings ----------
+  function buildIncuSetGroup(scene) {
+    var items = [];
+    items.push(scene.add.text(672, 158, 'CO2 인큐베이터 설정 확인', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } }));
+    items.push(scene.add.text(672, 178, '표준 배양 조건(37°C / 5% CO2)에 맞게 수정하세요.', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76', wordWrap: { width: 195 } }));
+    refs.tempBtn = makeButton(scene, 672, 216, 140, 30, '온도 설정 (°C)', function () { openIncuInput('temp'); }); items.push(refs.tempBtn);
+    refs.tempConfirmBtn = makeButton(scene, 818, 216, 50, 30, '확인', confirmIncuInput); items.push(refs.tempConfirmBtn);
+    refs.co2Btn = makeButton(scene, 672, 254, 140, 30, 'CO2 설정 (%)', function () { openIncuInput('co2'); }); items.push(refs.co2Btn);
+    refs.co2ConfirmBtn = makeButton(scene, 818, 254, 50, 30, '확인', confirmIncuInput); items.push(refs.co2ConfirmBtn);
+    refs.closeDoorBtn = makeButton(scene, 672, 300, 195, 34, '플라스크 넣고 문 닫기', closeIncuDoor); items.push(refs.closeDoorBtn);
+    refs.groups['incuset'] = items;
+  }
+  function openIncuInput(which) {
+    if (state.step !== 6) return;
+    if (which === 'temp' && state.tempOk) return;
+    if (which === 'co2' && state.co2Ok) return;
+    state.incuInputTarget = which;
+    positionInput(672, 216 + (which === 'temp' ? 0 : 38), 130, 26, which === 'temp' ? '°C' : '%');
+    var input = document.getElementById('numInput');
+    input.onkeydown = function (e) { if (e.key === 'Enter') confirmIncuInput(); };
+  }
+  function confirmIncuInput() {
+    if (state.step !== 6 || !state.incuInputTarget) return;
+    var input = document.getElementById('numInput');
+    var v = parseFloat(input.value);
+    if (isNaN(v) || input.value === '') return;
+    var which = state.incuInputTarget;
+    var target = which === 'temp' ? TARGET_TEMP : TARGET_CO2;
+    if (v === target) {
+      if (which === 'temp') { state.tempOk = true; state.tempShown = TARGET_TEMP; }
+      else { state.co2Ok = true; state.co2Shown = TARGET_CO2; }
+      updateIncuDisplay();
+      hideInput();
+      showFeedback((which === 'temp' ? '온도' : 'CO2 농도') + '를 표준 배양 조건으로 정확히 설정했습니다.', true);
+    } else {
+      state.mistakes++; updateScore();
+      pushIssue('CO2 인큐베이터 설정 오류');
+      showFeedback('표준 배양 조건과 다릅니다 — 포유류 세포 배양 표준은 37°C / 5% CO2입니다. 다시 입력하세요.', false);
+    }
+  }
+  function closeIncuDoor() {
+    if (state.step !== 6) return;
+    if (!state.tempOk || !state.co2Ok) {
+      showFeedback('온도와 CO2 농도를 모두 표준 조건으로 설정한 뒤 넣으세요.', false);
+      return;
+    }
+    state.doorOpen = false;
+    drawIncuDoor();
+    showFeedback('새 플라스크를 인큐베이터에 넣고 문을 닫았습니다. 마지막으로 라벨을 작성하세요.', true);
+    setStep(7);
+  }
+
+  // ---------- STEP 7: labeling ----------
+  function buildLabelGroup(scene) {
+    var items = [];
+    items.push(scene.add.text(672, 158, '라벨 작성', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' }));
+    items.push(scene.add.text(672, 178, '날짜·계대번호(passage No.)·작업자 이니셜을 플라스크에 기입합니다.', { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76', wordWrap: { width: 195 } }));
+    refs.labelBtn = makeButton(scene, 672, 232, 195, 34, '라벨 작성 완료', finishLabel); items.push(refs.labelBtn);
+    refs.groups['label'] = items;
+  }
+  function finishLabel() {
+    if (state.step !== 7 || state.labeled) return;
+    state.labeled = true;
+    showFeedback('라벨을 작성해 부착했습니다. 계대배양 한 사이클을 완료했습니다!', true);
+    setStep(8);
+    showResult();
+  }
+
+  // ---------- update loop (timers) ----------
+  function update(time, delta) {
+    if (state.step === 1 && state.uvOn) {
+      state.uvElapsed += delta;
+      var uvBtn = refs.uvBtn;
+      if (uvBtn) uvBtn.t.setText(state.uvElapsed >= UV_RECOMMENDED_MS ? 'UV 살균 중 (충분)' : 'UV 살균 중… ' + Math.round(state.uvElapsed / 100) / 10 + 's');
+    }
+    if (state.step === 1 && state.blowerOn) {
+      state.blowerElapsed += delta;
+      var blowerBtn = refs.blowerBtn;
+      if (blowerBtn) blowerBtn.t.setText(state.blowerElapsed >= BLOWER_RECOMMENDED_MS ? '송풍 중 (충분)' : '송풍 중… ' + Math.round(state.blowerElapsed / 100) / 10 + 's');
+    }
+    if (state.step === 4 && state.trypsinActive) {
+      state.trypsinElapsed += delta;
+      refs.trypsinTimeText.setText(Math.round(state.trypsinElapsed / 100) / 10 + 's');
+      if (state.trypsinElapsed >= TRYPSIN_AUTOCAP_MS) {
+        neutralizeTrypsin(true);
+      }
+    }
+  }
+
+  // ---------- step / UI ----------
+  var STEP_LABELS = [
+    '1. 클린벤치 준비 (UV·송풍)',
+    '2. 물품 소독 후 반입',
+    '3. 플라스크 확인·계대 판단',
+    '4. 배지 제거→세척→트립신',
+    '5. 새 플라스크에 분주',
+    '6. 인큐베이터 조건 설정',
+    '7. 라벨링·마무리'
+  ];
+
+  function setStep(n) {
+    state.step = n;
+    var titles = {
+      1: '1단계 — 클린벤치 가동 준비', 2: '2단계 — 물품 소독·반입',
+      3: '3단계 — 배양 플라스크 확인', 4: '4단계 — 무균 조작(배지·세척·트립신)',
+      5: '5단계 — 새 플라스크 분주', 6: '6단계 — 인큐베이터 조건 설정',
+      7: '7단계 — 라벨링', 8: '완료!'
+    };
+    var hints = {
+      1: '오른쪽 "UV 살균 시작"을 눌러 충분히 기다린 뒤 "다음"을 누르고, 이어서 송풍도 같은 방식으로 안정화하세요.',
+      2: '왼쪽 물품을 클릭해 소독한 뒤, 클린벤치 작업대 안으로 드래그해서 반입하세요.',
+      3: '인큐베이터 문을 열어 컨플루언시를 확인한 뒤, 지금 계대할지 더 배양할지 판단하세요.',
+      4: '기존 배지 제거 → PBS 세척 → 트립신-EDTA 처리 후 적절한 시점에 신선 배지로 중화하세요.',
+      5: '표시된 분할비에 맞춰 새 플라스크에 옮길 현탁액 양을 계산해 입력하세요.',
+      6: '인큐베이터 온도·CO2 농도를 표준 배양 조건(37°C/5%)으로 맞춘 뒤 플라스크를 넣고 문을 닫으세요.',
+      7: '라벨을 작성해 완료하세요.',
+      8: '아래 결과를 확인하세요.'
+    };
+    refs.stepText.setText(titles[n] || '');
+    refs.hintText.setText(hints[n] || '');
+    refs.stepListText.setText(STEP_LABELS.map(function (s, i) {
+      var active = n === i + 1;
+      return (active ? '▶ ' : '   ') + s;
+    }).join('\n'));
+
+    var groupByStep = { 1: 'uv', 2: 'items', 3: 'door', 4: 'aseptic', 5: 'volume', 6: 'incuset', 7: 'label' };
+    showOnlyGroup(groupByStep[n] || null);
+
+    if (n === 2) { setItemsInteractive(true); } else { setItemsInteractive(n < 2); }
+    if (n === 5) {
+      refs.splitInfoText.setText('전체 세포 현탁액 ' + TOTAL_SUSPENSION_ML + ' mL를 1:' + state.splitRatio + ' 비율로 나눕니다.\n새 플라스크 1개에 옮길 양은?');
+      positionInput(672, 258, 130, 28, 'mL');
+      var input = document.getElementById('numInput');
+      input.onkeydown = function (e) { if (e.key === 'Enter') confirmVolume(); };
+    } else {
+      if (n !== 6) hideInput();
+    }
+  }
+  function setItemsInteractive(active) {
+    ITEMS.forEach(function (def) {
+      var obj = refs.itemObjs[def.id];
+      if (!obj || obj.placed) return;
+      if (active) {
+        obj.gfx.setInteractive(new Phaser.Geom.Rectangle(-20, -22, 40, 44), Phaser.Geom.Rectangle.Contains);
+        obj.chip.setInteractive(new Phaser.Geom.Rectangle(-30, -8, 60, 16), Phaser.Geom.Rectangle.Contains);
+      } else {
+        obj.gfx.disableInteractive();
+        obj.chip.disableInteractive();
+      }
+    });
+  }
+
+  function showFeedback(msg, ok) {
+    refs.feedbackText.setText((ok ? '✓ ' : '⚠ ') + msg);
+    refs.feedbackText.setColor(ok ? '#4fbfae' : '#e0735f');
+  }
+  function updateScore() {
+    refs.scoreText.setText('실수 ' + state.mistakes + '회');
+  }
+
+  function showResult() {
+    var scene = refs.scene;
+    scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
+    var grade = state.mistakes === 0 ? 'S — 완벽한 무균 조작' : state.mistakes <= 4 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';
+    var gradeColor = state.mistakes === 0 ? '#4fbfae' : state.mistakes <= 4 ? '#d9b564' : '#e0735f';
+
+    scene.add.rectangle(W / 2, H / 2, 540, 360, 0x14201c, 1).setStrokeStyle(1.5, 0x2a3b35);
+    scene.add.text(W / 2, H / 2 - 158, '세포 계대배양 사이클 완료', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 126, grade, { fontSize: '20px', fontFamily: 'sans-serif', color: gradeColor, fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 96, '실수 횟수: ' + state.mistakes + '회', { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(0.5);
+
+    var issueText = state.issues.length ? state.issues.map(function (s) { return '- ' + s; }).join('\n') : '- 발생한 품질 이슈 없음';
+    scene.add.text(W / 2, H / 2 - 68, '품질 이슈 목록', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#6b7d76', fontStyle: 'bold' }).setOrigin(0.5, 0);
+    scene.add.text(W / 2, H / 2 - 48, issueText, { fontSize: '11px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'left', lineSpacing: 5, wordWrap: { width: 460 } }).setOrigin(0.5, 0);
+
+    scene.add.text(W / 2, H / 2 + 128,
+      'UV·송풍 안정화, 물품 소독, 계대 시점 판단, 트립신 처리 타이밍, 분주량 계산, 배양 조건 설정이 모두 결과에 반영됩니다.',
+      { fontSize: '10.5px', fontFamily: 'sans-serif', color: '#6b7d76', align: 'center', wordWrap: { width: 480 } }).setOrigin(0.5, 0);
+
+    makeButton(scene, W / 2 - 90, H / 2 + 158, 180, 34, '다시 하기 (새 배치)', function () {
+      location.reload();
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
