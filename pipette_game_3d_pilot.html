@@ -14,7 +14,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 940px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -22,7 +22,7 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
     height: 700px;
     display: flex;
@@ -97,6 +97,29 @@
   .bandLabel { position: absolute; left: 42px; font-size: 9.5px; white-space: nowrap; }
   #stepListBox { margin-top: auto; font-size: 9.5px; color: #6b7d76; line-height: 1.6; }
   #stepListBox .active { color: #4fbfae; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #resultOverlay {
     position: absolute; inset: 0; background: rgba(0,0,0,0.72);
     display: none; align-items: center; justify-content: center;
@@ -163,6 +186,13 @@
       <button class="btn3d" id="ejectBtn">팁 이젝터 (클릭)</button>
 
       <div id="stepListBox"></div>
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧪 마이크로피펫이란?</h2>
+      <p class="manualIntro">QC/QA 실험실에서 µL(마이크로리터) 단위의 미량 액체를 정밀하게 측정·이동시키는 필수 기구예요. 시약 조제, 검량선 작성, 시료 희석 등 거의 모든 실험의 출발점이 피펫팅이기 때문에, 잘못된 조작 하나가 전체 실험 결과의 신뢰도를 떨어뜨릴 수 있습니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
     </div>
   </div>
   <p class="note">※ 이 버전은 3D 엔진(Three.js) 위에서 마우스·키보드 조작감을 검증하는 파일럿입니다. 실제 3D 모델(AI로 생성한 기구 형태) 대신 기본 도형으로 위치·비율만 표현했으며, 게임 판정 로직은 기존 2D 프로토타입과 동일합니다.</p>
@@ -877,6 +907,34 @@
     '6. 팁 이젝터로 폐기'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 팁 선택·장착', body: '피펫 팁은 흡입 가능한 볼륨 범위가 정해져 있어요(P10: 0.5~10µL, P20: 10~20µL, P200: 20~200µL, P1000: 200~1000µL). 범위를 벗어난 팁을 쓰면 정밀도가 크게 떨어지거나 아예 흡입이 안 돼요. 목표 볼륨에 맞는 팁을 고르는 것이 정확한 측정의 첫 단추입니다.' },
+    { title: '2. 목표 볼륨 입력', body: '볼륨을 정확히 맞추는 과정이에요. 여기서 오차가 생기면 이후 모든 단계를 완벽히 수행해도 결과 자체가 틀어집니다. 실험 재현성의 출발점이 바로 이 설정값이에요.' },
+    { title: '3. 흡입 (Aspirate)', body: '1st stop까지 눌렀다가 위로 "천천히" 놓아야 하는 이유가 있어요. 급하게 놓으면 액체가 출렁이며 기포가 생기고, 그 기포만큼 실제 흡입량이 부족해져요. 일정한 속도로 부드럽게 흡입하는 습관은 QC 실무자가 가장 먼저 배우는 기본기예요.' },
+    { title: '4. 기포 확인', body: '육안으로 팁 끝을 확인해 기포가 없는지 점검하는 단계예요. 기포가 보이면 반드시 다시 흡입해야 해요 — 기포를 그대로 배출하면 실제 전달된 액체량이 목표보다 적어져 시약 조제·희석 오차로 이어집니다.' },
+    { title: '5. 배출 (Dispense)', body: '1st stop에서만 멈추면 피펫 내부에 소량이 남아요. 완전히 배출하려면 2nd stop까지 눌러야 해요. 이 "잔량"은 눈에 잘 띄지 않지만, 반복되면 시약 농도나 반응 수율에 누적된 오차를 만듭니다.' },
+    { title: '6. 팁 폐기', body: '사용한 팁을 새 팁으로 교체·폐기하는 이유는 교차오염(carry-over) 방지예요. 이전 시료가 미량이라도 다음 시료에 섞이면 그 결과는 신뢰할 수 없게 돼요. GMP 실험실에서 팁을 1회용으로만 쓰는 이유입니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '6단계를 모두 거치며 확인했듯, 마이크로피펫팅의 정확도는 "올바른 팁 선택 → 정확한 볼륨 설정 → 부드러운 흡입 → 기포 없는 확인 → 완전한 배출 → 오염 방지를 위한 폐기"라는 하나로 이어진 습관에서 나와요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n === 7) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1) || (n === 4 && i === 3);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -899,6 +957,7 @@
     }).join('');
     document.getElementById('ejectBtn').disabled = (n !== 6);
     document.getElementById('confirmVolBtn').disabled = (n !== 2);
+    renderManual(n);
   }
 
   function showFeedback(msg, ok) {

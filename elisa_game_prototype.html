@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -29,13 +29,38 @@
   }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   .note {
     margin-top: 14px;
     font-size: 12px;
@@ -49,7 +74,16 @@
   <h1>🧫 ELISA 실전 게임 — 프로토타입</h1>
   <p class="sub">음성대조군·표준물질 2종·시료 3개를 96웰 스트립에 로딩하고, 세척 → 검출항체 → 세척 → 기질(TMB) 발색까지 실제 순서대로 진행해보세요. 발색을 너무 일찍 멈추거나 너무 오래 두면 결과 판독이 어려워집니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
+    <div id="canvasHost">
+      <div id="game"></div>
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧫 ELISA란?</h2>
+      <p class="manualIntro">항원-항체 반응과 효소 발색을 이용해, 시료 속 특정 물질의 존재 유무와 농도를 정량적으로 측정하는 QC/QA 핵심 분석법이에요. 신약·백신의 함량 시험, 불순물 검출 등 다양한 곳에 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 샌드위치 ELISA(코팅은 사전 완료된 상태로 가정)를 단순화했으며, 실제 세척 횟수·발색 시간·정지 타이밍은 키트·장비에 따라 달라집니다.</p>
 </div>
@@ -417,7 +451,7 @@
       updateScore();
       showFeedback('발색이 다소 과하게 진행되었습니다(표준H 기준 약 ' + Math.round(stdHPct) + '%) — 고농도 구간의 구별력이 떨어질 수 있습니다.', false);
     } else {
-      showFeedback('적절한 시점(표준H 기준 약 ' + Math.round(stdHPct) + '%)에 정지 용액 추가했습니다 — 청색이 노란색으로 바뀝니다.', true);
+      showFeedback('적절한 시점(표준H 기준 약 ' + Math.round(stdHPct) + '%)에 정지 용액을 추가했습니다 — 청색이 노란색으로 바뀝니다.', true);
     }
     drawWells();
     setStep(7);
@@ -454,6 +488,35 @@
     '7. 판독기로 결과 확인'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 대조군·표준액·시료 로딩', body: '음성대조군은 "신호가 없어야 정상"임을 확인하는 기준점이고, 표준물질(농도를 아는 시료)은 나중에 시료의 농도를 환산할 수 있는 검량선의 기준이 돼요. 이 기준들 없이는 시료의 OD값만으로는 농도를 알 수 없습니다.' },
+    { title: '2. 1차 세척', body: '결합하지 않은 항원·불순물을 씻어내는 단계예요. 세척이 부족하면 비특이적 결합 물질이 남아 배경 신호(백그라운드)가 높아져, 실제 신호와 잡음을 구분하기 어려워집니다.' },
+    { title: '3. 검출항체(효소표지) 추가', body: '항원에 결합한 검출항체(효소 부착)가 나중에 기질과 반응해 색을 내는 "신호 발생기" 역할을 해요. 이 항체가 없으면 발색 반응 자체가 일어나지 않습니다.' },
+    { title: '4. 2차 세척', body: '결합하지 않은 검출항체를 씻어내는 단계예요. 여기서도 세척이 부족하면 남은 항체가 배경 신호를 높여 결과의 신뢰도를 떨어뜨립니다.' },
+    { title: '5. 기질(TMB) 추가', body: '효소와 반응해 색을 내는 기질을 넣어 발색을 시작시키는 단계예요. 색의 진하기가 곧 항원 농도(신호)를 눈으로 보여주는 지표가 됩니다.' },
+    { title: '6. 발색 관찰 → 정지', body: '색이 충분히 진해졌을 때 정지 용액을 넣어야 해요. 너무 일찍 멈추면 신호가 약해 구별이 어렵고, 너무 늦으면 모든 웰이 진하게 포화되어 농도 차이를 구별할 수 없게 됩니다. 정확한 타이밍이 정량 분석의 핵심이에요.' },
+    { title: '7. 판독기로 결과 확인', body: '플레이트 리더가 각 웰의 흡광도(OD)를 수치로 읽어내는 단계예요. 이 숫자를 표준물질의 검량선과 비교해 시료의 실제 농도를 계산하게 됩니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '대조군·표준물질을 기준으로 삼고, 두 번의 세척으로 잡음을 걷어내고, 발색을 적절한 타이밍에 멈춰 판독하기까지 — ELISA의 정확도는 "기준을 정하고 → 불필요한 신호를 지우고 → 타이밍을 지키는" 세 원칙에서 나옵니다.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -472,7 +535,7 @@
       3: '"검출항체(효소표지) 추가" 버튼을 눌러 모든 웰에 검출항체를 넣으세요.',
       4: '검출항체 반응 후에도 세척이 필요합니다 — "세척" 버튼을 눌러 미결합 항체를 씻어내세요(권장 3회).',
       5: '"기질(TMB) 추가" 버튼을 눌러 발색 반응을 시작하세요.',
-      6: '표준H 웰(2번)의 색이 짙어지는 것을 지켜보세요. 색이 충분히(하지만 포화되기 전) 짙어졌을 때 "정지 용액 추가.를 누르세요.',
+      6: '표준H 웰(2번)의 색이 짙어지는 것을 지켜보세요. 색이 충분히(하지만 포화되기 전) 짙어졌을 때 "정지 용액 추가"를 누르세요.',
       7: '"판독기(플레이트 리더)로 이동" 버튼으로 최종 결과를 확인하세요.',
       8: '아래 결과를 확인하세요.'
     };
@@ -482,6 +545,7 @@
       var active = n === i + 1;
       return (active ? '▶ ' : '   ') + s;
     }).join('\n'));
+    renderManual(n);
   }
 
   function showFeedback(msg, ok) {
@@ -500,6 +564,7 @@
   }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     var overlay = scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 ELISA SOP 수행' : state.mistakes <= 2 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';

@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -21,13 +21,38 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #numInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -48,8 +73,17 @@
   <h1>🔬 유세포분석기(Flow Cytometer) 실전 게임 — 프로토타입</h1>
   <p class="sub">면역세포 표면항체 염색부터 기기 셋업, PMT 전압 설정, 측정(Acquisition), 게이팅·분석까지 실제 FACS 분석 워크플로우를 체험합니다. 튜브 배치 순서, 염색 패널 구성, 인큐베이션 타이밍, 전압 설정, 게이팅 정확도가 모두 결과에 반영됩니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="numInput" type="number" step="1" placeholder="">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="numInput" type="number" step="1" placeholder="">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🔬 유세포분석기란?</h2>
+      <p class="manualIntro">레이저를 이용해 한 번에 수천~수만 개의 세포를 하나씩 지나가게 하면서, 세포의 크기·내부 구조·표면에 붙은 형광 표지 항체를 동시에 측정하는 장비예요. 면역세포 아형 분석, 세포 상태 확인 등에 널리 쓰이는 QC/연구 핵심 기법입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 세포 준비·컴펜세이션의 세부 계산은 학습 목적으로 단순화했습니다.</p>
 </div>
@@ -672,6 +706,35 @@
     '7. 게이팅·결과 확인'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 튜브 랙 배치', body: '무염색 대조군은 세포 자체의 배경 형광(자가형광) 수준을 알려주는 기준이고, FMO(Fluorescence Minus One) 대조군은 형광 채널끼리 서로 간섭(스필오버)하는 정도를 보정하기 위한 기준이에요. 이 기준들 없이는 실제 신호가 진짜 양성인지 배경 잡음인지 구분할 수 없습니다.' },
+    { title: '2. 항체 염색·인큐베이션', body: '튜브마다 다른 패널(무염색=항체 없음, FMO=일부만)을 정확히 구성해야 나중에 보정 계산이 정확해져요. 인큐베이션 시간이 부족하면 항체가 충분히 결합하지 못해 신호가 약해지고, 너무 길면 비특이적 결합이 늘어납니다.' },
+    { title: '3. FACS 버퍼 세척', body: '결합하지 않은 항체를 씻어내는 단계예요. 세척이 부족하면 떠다니는 형광 항체가 배경 신호를 높여, 실제 양성/음성 구분이 흐려집니다.' },
+    { title: '4. 기기 셋업', body: '시스 액(Sheath Fluid)은 세포를 한 줄로 정렬시켜 레이저가 한 번에 하나씩만 인식하게 해주는 매개체이고, 컴펜세이션은 형광 채널 간 신호 간섭을 수학적으로 보정하는 과정이에요. 설정이 틀어지면 세포가 뭉쳐서 측정되거나(더블릿), 채널 간 신호가 서로 오염됩니다.' },
+    { title: '5. PMT 전압 설정', body: '무염색 대조군 신호를 표준 위치(1st decade)에 맞추는 이유예요. 전압이 너무 낮으면 약한 신호를 놓치고, 너무 높으면 신호가 스케일을 벗어나 버려요. 모든 시료를 같은 기준선에서 비교하려면 이 보정이 필수입니다.' },
+    { title: '6. 측정 실행(Acquisition)', body: '목표 이벤트 수(예: 10,000개)까지 채우는 이유예요. 측정한 세포 수가 적으면 통계적으로 신뢰할 수 없는 결과가 나와요. 특히 희귀한 세포 집단을 분석할 때는 충분한 이벤트 수 확보가 결과 신뢰도에 직결됩니다.' },
+    { title: '7. 게이팅·결과 확인', body: '산점도에서 디브리스(세포 조각)·응집체(더블릿)를 제외하고 생존세포만 골라내는 단계예요. 죽거나 뭉친 세포, 파편까지 포함해 분석하면 실제 살아있는 단일세포의 표면항원 비율이 왜곡됩니다. 정확한 게이트가 정확한 % 결과의 전제조건이에요.' }
+  ];
+  var MANUAL_DONE_NOTE = '적절한 대조군을 기준 삼고, 세척으로 잡음을 지우고, 전압·컴펜세이션을 보정하고, 정확한 게이트로 대상을 골라내기까지 — 유세포분석은 각 단계의 "기준을 맞추는 작업"이 최종 % 결과의 신뢰도를 결정해요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -722,6 +785,7 @@
     } else {
       hideInput();
     }
+    renderManual(n);
   }
   function setTubesInteractive(active) {
     TUBES.forEach(function (def) {
@@ -762,6 +826,7 @@
   }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 분석' : state.mistakes <= 4 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';

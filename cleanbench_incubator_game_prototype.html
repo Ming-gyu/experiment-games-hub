@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -21,13 +21,38 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #numInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -48,8 +73,17 @@
   <h1>🧬 클린벤치·CO2인큐베이터 실전 게임 — 프로토타입</h1>
   <p class="sub">클린벤치(생물안전작업대)에서의 무균 조작과 CO2 인큐베이터의 배양 환경 관리를, 실제 세포 계대배양(Subculture/Passage) SOP 흐름으로 이어서 체험합니다. UV 살균·송풍 안정화부터 물품 소독, 계대 시점 판단, 트립신 처리 타이밍, 분주량 계산, 배양 조건 설정까지 실제 절차에서 결과를 좌우하는 지점을 반영했습니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="numInput" type="number" step="0.1" placeholder="">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="numInput" type="number" step="0.1" placeholder="">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧬 클린벤치·CO2인큐베이터란?</h2>
+      <p class="manualIntro">클린벤치(생물안전작업대)는 무균 상태에서 세포·시료를 다루기 위한 작업 공간이고, CO2 인큐베이터는 세포가 자랄 수 있는 온도·습도·CO2 농도를 유지하는 배양기예요. 두 기구는 세포 배양 실험의 "무균 조작"과 "배양 환경 유지"를 각각 담당하는 짝꿍 같은 장비입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 코팅·배지 조성 등은 사전 준비된 상태로 가정했고, 실제 UV 살균·기류 안정화·트립신 처리 시간은 이 게임에서 학습 목적으로 압축했습니다.</p>
 </div>
@@ -652,6 +686,35 @@
     '7. 라벨링·마무리'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 클린벤치 준비(UV·송풍)', body: 'UV는 작업대 표면의 미생물을 사멸시키고, 층류 송풍은 외부 오염 입자가 작업 공간으로 들어오지 못하게 막는 보호막 역할을 해요. 이 준비 없이 바로 작업하면 세포 배양이 오염될 위험이 커집니다.' },
+    { title: '2. 물품 소독 후 반입', body: '클린벤치 안으로 물건을 넣기 전 70% 에탄올로 표면을 닦는 이유예요. 물품 표면에 묻은 미생물이 무균 작업 공간 안으로 함께 들어오는 것을 막기 위해서죠. 소독 없이 반입하면 UV·송풍이 잘 되어 있어도 오염 경로가 열립니다.' },
+    { title: '3. 플라스크 확인·계대 판단', body: '컨플루언시(세포 밀도)를 확인하는 단계예요. 너무 빽빽해지면(과밀) 세포가 영양 부족·접촉 억제로 상태가 나빠지고, 너무 이르게 계대하면 세포 수가 부족해 다음 배양이 잘 자라지 않아요. 70~90%가 적절한 계대 시점입니다.' },
+    { title: '4. 배지 제거→세척→트립신', body: 'PBS 세척은 남은 배지 속 혈청 성분을 제거해 트립신이 제대로 작동하게 해주고, 트립신-EDTA는 세포를 바닥에서 떼어내는 효소예요. 너무 빨리 중화하면 세포가 덜 떨어지고(미해리), 너무 오래 두면 세포막이 손상됩니다.' },
+    { title: '5. 새 플라스크에 분주', body: '분할비(1:4, 1:6 등)에 맞춰 옮길 양을 정확히 계산하는 이유예요. 너무 적게 옮기면 세포가 자리 잡는 데 오래 걸리고, 너무 많이 옮기면 금방 과밀해져 다음 계대 주기가 짧아지고 세포 상태도 나빠집니다.' },
+    { title: '6. 인큐베이터 조건 설정', body: '37°C·5% CO2는 대부분의 포유류 세포가 최적으로 자라는 표준 배양 조건이에요. 온도나 CO2 농도가 틀어지면 배지의 pH가 변하거나 세포 대사가 느려져 성장이 저해됩니다.' },
+    { title: '7. 라벨링·마무리', body: '날짜·계대번호·이니셜을 기록해두면 나중에 이 세포가 몇 번째 계대인지, 언제 시작했는지 추적할 수 있어요. 기록이 없으면 오래 배양된 세포(고계대)를 모르고 쓰는 실수로 이어질 수 있습니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '무균 환경을 먼저 만들고(UV·송풍·소독), 배양 상태를 정확히 판단하고, 정해진 타이밍과 계산을 지키는 것 — 클린벤치·인큐베이터 작업은 눈에 보이지 않는 오염을 막는 습관의 연속이에요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -689,6 +752,7 @@
     } else {
       if (n !== 6) hideInput();
     }
+    renderManual(n);
   }
   function setItemsInteractive(active) {
     ITEMS.forEach(function (def) {
@@ -713,6 +777,7 @@
   }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 무균 조작' : state.mistakes <= 4 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';

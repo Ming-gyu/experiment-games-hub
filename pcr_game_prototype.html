@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -21,13 +21,38 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #numInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -48,8 +73,17 @@
   <h1>🧬 PCR 열순환기 실전 게임 — 프로토타입 (심화판)</h1>
   <p class="sub">프라이머 선택부터 마스터믹스 조제, 시료·대조군 로딩, 어닐링 온도·신장 시간·사이클 수 설정, 런 진행, 겔 확인까지 — 실제 PCR SOP에서 결과 품질을 좌우하는 변수를 반영했습니다. 프라이머 Tm과 증폭산물 크기는 매 판 달라집니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="numInput" type="number" step="1" placeholder="">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="numInput" type="number" step="1" placeholder="">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧬 PCR이란?</h2>
+      <p class="manualIntro">특정 DNA 구간을 반복적인 온도 변화만으로 기하급수적으로 증폭시켜, 미량의 DNA로도 유전자를 검출·확인할 수 있게 하는 분자생물학 핵심 기법이에요. 유전자 동정, 오염 검출, 진단 등에 광범위하게 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 실제 어닐링 온도·신장 시간·사이클 수 최적값은 프라이머·중합효소·기기에 따라 달라지며, 이 게임에서는 학습 목적으로 대표적인 계산 규칙(어닐링 = Tm−3~6°C, 신장 = 약 1분/kb)으로 단순화했습니다.</p>
 </div>
@@ -636,6 +670,34 @@
   ];
   var GROUP_BY_STEP = { 1: 'primer', 2: 'mix', 3: 'sample', 4: 'program', 5: 'run', 6: 'imager' };
 
+  var MANUAL_STEPS = [
+    { title: '1. 프라이머 세트 선택', body: '프라이머는 증폭하려는 DNA 서열의 양 끝에 정확히 달라붙어야만 PCR이 작동해요. 목표 유전자에 맞지 않는 프라이머를 쓰면 증폭이 전혀 안 되거나 엉뚱한 부위가 증폭됩니다.' },
+    { title: '2. 마스터믹스 조제', body: '정제수→버퍼→dNTP→프라이머→효소 순서를 지키는 이유예요. Taq 중합효소를 먼저 넣으면 상온에서 비특이적 반응이 시작될 수 있고(효소 조기 활성화), 시약 안정성도 떨어져요. 정해진 순서가 재현성 있는 반응의 기본입니다.' },
+    { title: '3. 시료·대조군 로딩', body: 'NTC(무증폭 대조군)는 "오염이 없다면 밴드가 없어야 정상"임을, 양성대조군은 "반응이 제대로 작동한다면 밴드가 나와야 정상"임을 확인하는 기준이에요. 이 대조군들 없이는 시료 결과가 진짜인지 오염·반응 실패인지 구분할 수 없습니다.' },
+    { title: '4. 프로그램 설정', body: '어닐링 온도가 너무 높으면 프라이머가 붙지 못해 증폭이 약해지고, 너무 낮으면 엉뚱한 곳에 붙어 비특이적 밴드가 생겨요. 신장 시간이 부족하면 완전한 증폭산물이 만들어지지 못합니다. 모두 프라이머 Tm·산물 크기에 맞춰 계산해야 해요.' },
+    { title: '5. PCR 런 진행', body: '변성(가닥 분리)→어닐링(프라이머 결합)→신장(복제)이 반복될 때마다 DNA가 2배씩 기하급수적으로 늘어나요. 사이클 수가 적으면 검출하기에 DNA 양이 부족하고, 너무 많으면 비특이적 산물도 함께 늘어납니다.' },
+    { title: '6. 겔 전기영동 결과 확인', body: '증폭된 DNA를 겔에서 크기별로 분리해 눈으로 확인하는 마무리 단계예요. NTC 레인에 밴드가 없고 양성대조군엔 뚜렷한 밴드가 있어야 이번 PCR이 정상적으로 작동했다고 판단할 수 있습니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '정확한 프라이머 선택 → 순서를 지킨 시약 조제 → 대조군을 포함한 로딩 → 서열 특성에 맞춘 온도·시간 설정까지, PCR은 준비 단계의 정밀함이 증폭 결과의 신뢰도를 결정하는 대표적인 시험이에요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 7) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -672,6 +734,7 @@
     }
     if (n === 3) { drawWells(); }
     updateInfoText();
+    renderManual(n);
   }
 
   function updateInfoText() {
@@ -691,6 +754,7 @@
   function updateScore() { refs.scoreText.setText('실수 ' + state.mistakes + '회'); }
 
   function showResult() {
+    renderManual(7);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 PCR SOP 수행' : state.mistakes <= 4 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';

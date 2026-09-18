@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -21,13 +21,38 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #numInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -48,8 +73,17 @@
   <h1>♨️ 오토클레이브(고압증기멸균기) 실전 게임 — 프로토타입 (심화판)</h1>
   <p class="sub">품목 확인·사이클 선택부터 로딩, 공기 제거 방식 선택, 멸균 온도·시간 설정, 승온·노출시간 유지, 배기·도어 개방, 인디케이터 판독까지 — 실제 멸균 SOP에서 결과를 좌우하는 변수를 반영했습니다. 매 판마다 처리할 품목(액체/기구/포장기구/폐기물)이 달라집니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="numInput" type="number" step="1" placeholder="">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="numInput" type="number" step="1" placeholder="">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>♨️ 오토클레이브란?</h2>
+      <p class="manualIntro">고온·고압 포화수증기로 미생물(포자 포함)을 완전히 사멸시키는 멸균 기구예요. 배지·기구·폐기물 등 실험실에서 다루는 거의 모든 것의 무균 상태를 보장하는 마지막 관문입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 실제 멸균 사이클의 승온·노출·배기 시간은 기종·품목에 따라 다르며, 이 게임에서는 학습 목적으로 시간을 압축했습니다. 생물학적 인디케이터(BI)는 실제로는 배양에 24~48시간이 걸리지만, 이 게임에서는 결과를 즉시 표시합니다.</p>
 </div>
@@ -743,6 +777,35 @@
   ];
   var GROUP_BY_STEP = { 1: 'cycle', 2: 'load', 3: 'air', 4: 'params', 5: 'hold', 6: 'exhaust', 7: 'imager' };
 
+  var MANUAL_STEPS = [
+    { title: '1. 품목 확인·사이클 선택', body: '품목마다 다른 멸균 사이클(액체/고체/포장기구(진공)/폐기물)을 고르는 이유예요. 액체는 급격한 압력 변화 시 끓어넘칠 수 있고, 포장된 기구는 내부까지 증기가 충분히 침투해야 해서, 품목 특성에 맞는 사이클을 골라야 실제로 멸균이 이루어집니다.' },
+    { title: '2. 로딩 준비 점검·적재', body: '품목별 사전 점검(병뚜껑 느슨하게 풀기, 인디케이터 테이프 부착 등)을 거치는 이유예요. 점검 없이 바로 적재하면 압력 변화로 용기가 파손되거나, 나중에 멸균 여부를 확인할 방법이 없어집니다.' },
+    { title: '3. 공기 제거 방식 선택', body: '다공성 포장 품목은 내부에 공기 포켓이 남기 쉬워, 예비진공식으로 강제로 공기를 빼내야 증기가 구석구석 침투할 수 있어요. 중력식을 잘못 선택하면 겉보기엔 멸균된 것 같아도 포장 내부는 멸균되지 않을 수 있습니다.' },
+    { title: '4. 멸균 온도·시간 설정', body: '121°C/134°C 온도와 노출시간을 품목에 맞게 정하는 단계예요. 온도가 높을수록 필요한 시간은 짧아지지만 열에 약한 재질엔 낮은 온도를 써야 하고, 노출시간이 부족하면 미생물이 완전히 사멸하지 않습니다.' },
+    { title: '5. 승온·노출시간 유지', body: '목표 온도·압력에 도달한 후에야 노출시간을 세기 시작해요. 승온 중에는 아직 멸균 온도에 도달하지 않았기 때문에, 이 시간을 노출시간에 포함시키면 실제 멸균 시간이 부족해집니다. 시간이 끝나기 전에 감압하면 미생물이 살아남을 수 있어요.' },
+    { title: '6. 배기·도어 개방', body: '액체를 급속배기하면 내부 압력이 급격히 낮아지며 끓어넘치거나 용기가 파손될 수 있어요. 압력이 완전히 0이 되기 전에 도어를 열면 고온 증기 분출로 심각한 화상 사고로 이어질 수 있습니다.' },
+    { title: '7. 인디케이터 결과 확인', body: '화학적 인디케이터(테이프)는 "멸균 조건에 노출은 됐다"는 것만 보여주고, 실제로 미생물이 죽었는지는 생물학적 인디케이터(BI)로만 확인할 수 있어요. 화학적 인디케이터가 정상이어도 BI가 실패하면 멸균은 실패한 것입니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '품목에 맞는 사이클·공기 제거 방식·온도를 고르고, 충분한 노출시간을 지키고, 안전하게 배기하기까지 — 오토클레이브는 "화학적 인디케이터가 정상"만으로는 안심할 수 없고, 생물학적 인디케이터로 실제 사멸을 확인해야 비로소 완료되는 시험이에요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -790,6 +853,7 @@
       state.pressureProgress = 1;
     }
     updateInfoText();
+    renderManual(n);
   }
 
   function updateInfoText() {
@@ -809,6 +873,7 @@
   function updateScore() { refs.scoreText.setText('실수 ' + state.mistakes + '회'); }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var fail = isBIFail();

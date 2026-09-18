@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -29,13 +29,38 @@
   }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   .domInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -61,9 +86,18 @@
   <h1>⚡ 전기영동(SDS-PAGE) 실전 게임 — 프로토타입 (심화판)</h1>
   <p class="sub">겔 농도 선택부터 시료 전처리(환원·가열), 로딩량, 웰 로딩, 완충액·리드선 점검, 스태킹겔→러닝겔 2단계 전압 전환, 정지 타이밍까지 — 실제 SDS-PAGE 현장에서 생기는 변수를 최대한 반영했습니다. 각 단계의 실수는 마지막 밴드 결과에 실제로 반영됩니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="voltInput" class="domInput" type="number" step="1" min="0" max="300" placeholder="V">
-    <input id="volInput" class="domInput" type="number" step="1" min="0" max="100" placeholder="µL">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="voltInput" class="domInput" type="number" step="1" min="0" max="300" placeholder="V">
+      <input id="volInput" class="domInput" type="number" step="1" min="0" max="100" placeholder="µL">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>⚡ 전기영동(SDS-PAGE)이란?</h2>
+      <p class="manualIntro">전기장 안에서 하전을 띤 분자(단백질·DNA 등)가 크기에 따라 다른 속도로 이동하는 원리를 이용해, 혼합물 속 성분을 분리·확인하는 QC 핵심 기법이에요. SDS-PAGE는 단백질을 크기별로 분리해 순도·정체성을 확인할 때 널리 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 세로형 SDS-PAGE(단백질 전기영동) 기준으로 설계했으며, 겔 농도·전압·가열 시간·로딩량 등의 구체적인 수치는 학습 목적으로 대표적인 범위로 단순화했습니다. 실제 값은 컬럼·시약·장비 제조사 프로토콜을 따르세요.</p>
 </div>
@@ -900,6 +934,35 @@
 
   var GROUP_BY_STEP = { 1: 'gel', 2: 'prep', 3: 'loadvol', 4: 'loadwells', 5: 'final', 6: 'run', 7: 'imager' };
 
+  var MANUAL_STEPS = [
+    { title: '1. 겔 농도 선택', body: '목표 분자량 범위에 맞는 겔 농도(%)를 고르는 단계예요. 농도가 낮을수록 큰 분자량 단백질을, 높을수록 작은 분자량 단백질을 더 잘 분리합니다. 농도가 맞지 않으면 밴드가 겔 끝에 뭉치거나 아예 분리되지 않아요.' },
+    { title: '2. 시료 전처리(환원·가열)', body: 'DTT/BME(환원제)로 이황화 결합을 끊고 95°C로 가열해 단백질의 입체구조를 풀어(변성), 오직 크기만으로 이동 속도가 결정되게 만드는 과정이에요. 가열이 부족하면 미변성 단백질이 남아 밴드가 흐려지고, 과가열하면 오히려 단백질이 분해·응집됩니다.' },
+    { title: '3. 로딩량 설정', body: '레인당 넣을 시료량을 정하는 단계예요. 너무 많이 넣으면 웰이 넘쳐 옆 레인을 오염시키고, 너무 적으면 밴드 신호가 약해 검출이 어려워집니다.' },
+    { title: '4. 샘플 로딩', body: '마커(사이즈 표준)와 시료를 정해진 레인 순서대로 넣는 단계예요. 마커를 기준 레인에 둬야 나중에 각 밴드의 분자량을 비교·판독할 수 있어요. 순서가 뒤바뀌면 어떤 밴드가 어떤 시료인지 알 수 없게 됩니다.' },
+    { title: '5. 최종 점검·전압 설정', body: '완충액이 부족하면 회로가 끊겨 전기영동이 안 되고, 리드선 극성이 바뀌면 시료가 반대 방향으로 흘러 웰 밖으로 사라져요. 스태킹겔 구간은 낮은 전압(60~100V)으로 시작해 시료를 얇은 띠로 모으는 준비 단계입니다.' },
+    { title: '6. 전기영동 진행', body: '스태킹겔→러닝겔 전환이 너무 이르면 시료가 충분히 농축되지 않아 밴드 폭이 넓어지고, 너무 늦으면 시간만 낭비돼요. 정지 타이밍을 놓치면 작은 단백질이 겔 밖으로 흘러나가(런오프) 아예 사라져버립니다.' },
+    { title: '7. 이미저로 결과 확인', body: '완성된 겔을 UV/염색 이미저로 관찰해, 밴드의 위치·선명도로 앞선 모든 단계를 올바르게 수행했는지 시각적으로 확인하는 마무리 단계예요.' }
+  ];
+  var MANUAL_DONE_NOTE = '겔 농도 선택 → 전처리 → 로딩량 → 샘플 로딩 → 완충액·전압 점검 → 전압 전환 타이밍 → 이미징까지, 각 단계의 작은 실수가 모두 밴드 모양에 그대로 남는다는 걸 확인했어요. 그래서 실제 QC 실무에서도 전기영동은 손이 많이 가는 만큼 꼼꼼함이 중요한 시험입니다.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -938,6 +1001,7 @@
     if (n === 3) { positionInput('volInput', 672, 178, 130, 30); }
     if (n === 5) { positionInput('voltInput', 672, 372, 130, 30); }
     updateInfoText();
+    renderManual(n);
   }
 
   function updateInfoText() {
@@ -960,6 +1024,7 @@
   }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     var overlay = scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var panel = scene.add.rectangle(W / 2, H / 2, 500, 320, 0x14201c, 1).setStrokeStyle(1.5, 0x2a3b35);

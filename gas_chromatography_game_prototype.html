@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -21,13 +21,38 @@
   .sub { font-size: 13px; color: #93a69f; margin: 0 0 14px; line-height: 1.6; }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #numInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -48,8 +73,17 @@
   <h1>🧪 가스 크로마토그래피(GC) 실전 게임 — 프로토타입</h1>
   <p class="sub">바이알 로딩부터 검출기·캐리어가스 선택, 주입 모드·주입량 설정, 오븐 온도 프로그램(승온 램프), 런 진행, 데이터 리뷰까지 실제 GC 분석 워크플로우를 체험합니다. HPLC 게임과 구조는 비슷하지만, GC만의 온도 프로그램·캐리어가스·검출기 선택이 핵심입니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="numInput" type="number" step="0.1" placeholder="">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="numInput" type="number" step="0.1" placeholder="">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧪 가스 크로마토그래피(GC)란?</h2>
+      <p class="manualIntro">시료를 기화시켜 캐리어가스로 컬럼을 통과시키면서, 끓는점·극성 차이로 성분을 분리·검출하는 분석법이에요. 휘발성 유기용매, 잔류용매(ppm 단위 미량 불순물) 분석 등 HPLC로는 다루기 어려운 휘발성 물질 분석에 특화되어 있습니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 컬럼 선택·유도체화 등은 사전에 완료된 상태로 가정했고, 오븐 온도·유량 등의 기준값은 학습 목적으로 게임 내에서 단순화한 값입니다(실제 분석 조건은 성분·컬럼·장비에 따라 다릅니다).</p>
 </div>
@@ -599,6 +633,35 @@
     '7. 데이터 리뷰 및 결과 확인'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 바이알 로딩', body: '바탕용액→표준물질→QC→시료 순서로 넣는 이유예요. 바탕용액은 시스템 자체 신호가 없는지 확인하는 기준이고, 표준물질은 나중에 성분을 비교할 기준이에요. 순서가 바뀌면 캐리오버(이전 시료 잔류)가 다음 결과를 오염시킬 수 있습니다.' },
+    { title: '2. 검출기 선택', body: 'FID(불꽃이온화)는 유기 탄화수소를 매우 민감하게 검출하지만 영구가스(질소·이산화탄소 등)는 거의 검출하지 못하고, TCD(열전도도)는 민감도는 낮지만 거의 모든 물질을 검출할 수 있어요. 분석 대상에 안 맞는 검출기를 쓰면 신호가 아예 안 잡히거나 너무 약해집니다.' },
+    { title: '3. 캐리어가스 유량 설정', body: '헬륨 유량을 표준 범위로 맞추는 이유예요. 유량이 너무 빠르면 성분이 컬럼을 충분히 통과하지 못해 분리가 나빠지고, 너무 느리면 분석 시간이 길어지고 피크가 퍼집니다.' },
+    { title: '4. 주입 모드·주입량 설정', body: '고농도 시료를 스플릿리스로 주입하면 컬럼이 과부하되어 피크가 무너지고, 미량 시료를 스플릿으로 주입하면 신호가 너무 약해 검출이 안 될 수 있어요. 시료 농도에 맞는 모드 선택이 핵심입니다.' },
+    { title: '5. 오븐 온도 프로그램', body: '끓는점이 다른 성분들을 온도를 서서히 올려가며 차례로 기화·분리시키는 원리예요. 초기 온도가 너무 낮으면 무거운 성분이 안 나오고, 승온 속도가 너무 빠르면 끓는점이 가까운 성분들이 겹쳐서 나옵니다.' },
+    { title: '6. 런 진행', body: '모든 피크가 나올 때까지 기다려야 해요. 마지막 피크가 나오기 전에 종료하면 데이터가 불완전해져 재분석이 필요하고, 너무 오래 두면 분석 시간과 캐리어가스를 낭비합니다.' },
+    { title: '7. 데이터 리뷰', body: '각 피크의 머무름시간(RT)·높이·면적을 확인해, 어떤 성분이 얼마나 들어있는지 정량하는 최종 단계예요.' }
+  ];
+  var MANUAL_DONE_NOTE = '분석 대상에 맞는 검출기를 고르고, 가스 유량·주입 조건·온도 프로그램을 시료 특성에 맞춰 설정하는 것 — GC는 "휘발성 물질의 끓는점 차이"라는 원리를 이해하고 조건을 맞출수록 분리가 선명해지는 분석법이에요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -644,6 +707,7 @@
     } else {
       hideInput();
     }
+    renderManual(n);
   }
 
   function showFeedback(msg, ok) {
@@ -655,6 +719,7 @@
   }
 
   function showResult() {
+    renderManual(8);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 GC 분석' : state.mistakes <= 4 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';

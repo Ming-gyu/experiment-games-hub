@@ -13,7 +13,7 @@
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
   }
   .wrap {
-    max-width: 920px;
+    max-width: 1220px;
     margin: 20px auto;
     padding: 0 10px 30px;
   }
@@ -29,13 +29,38 @@
   }
   #gameWrap {
     position: relative;
-    width: 900px;
+    width: 1200px;
     max-width: 100%;
+    display: flex;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #2a3b35;
     box-shadow: 0 12px 34px rgba(0,0,0,0.4);
   }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
   #injInput {
     position: absolute;
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
@@ -61,8 +86,17 @@
   <h1>📈 HPLC 실전 게임 — 프로토타입</h1>
   <p class="sub">바탕용액·표준물질·QC 시료·시료 3개를 오토샘플러에 순서대로 로딩하고, 이동상을 평형화한 뒤 주입량을 설정해 표준물질로 시스템 적합성(System Suitability) 런을 진행해보세요. 크로마토그램의 피크가 다 나올 때까지 기다렸다가 적절한 시점에 종료하는 것이 핵심입니다.</p>
   <div id="gameWrap">
-    <div id="game"></div>
-    <input id="injInput" type="number" step="1" min="0" max="100" placeholder="µL">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="injInput" type="number" step="1" min="0" max="100" placeholder="µL">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>📈 HPLC란?</h2>
+      <p class="manualIntro">혼합물 속 성분들을 컬럼 통과 속도 차이로 분리해, 각 성분의 정체(머무름시간)와 농도(피크 면적)를 동시에 확인하는 QC 정량분석의 핵심 장비예요. 원료의약품 순도 시험, 함량 분석 등에 널리 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
   </div>
   <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 컬럼 코팅·이동상 조성 최적화 등은 사전에 완료된 상태로 가정했고, 실제 주입량·런타임·피크 모양은 컬럼·성분·장비에 따라 달라지며 이 게임에서는 학습 목적으로 대표적인 범위로 단순화했습니다.</p>
 </div>
@@ -503,6 +537,33 @@
     '5. 데이터 리뷰 및 결과 확인'
   ];
 
+  var MANUAL_STEPS = [
+    { title: '1. 바이알 로딩', body: '바탕용액(블랭크)은 컬럼·시스템 자체에 신호가 없는지 확인하는 기준이고, 표준물질은 피크의 머무름시간(RT)·농도를 비교할 기준이에요. 순서가 바뀌면 이전 시료의 잔류(캐리오버)가 다음 분석에 섞여 정량 결과가 왜곡될 수 있습니다.' },
+    { title: '2. 이동상 평형화', body: '컬럼과 이동상을 미리 안정화시키는 단계예요. 평형화가 부족하면 초기 런에서 머무름시간(RT)이 밀리거나 피크 모양이 무너져, 같은 시료라도 분석마다 결과가 달라지는 재현성 문제가 생깁니다.' },
+    { title: '3. 주입량 설정', body: '5~20µL 권장 범위를 지키는 이유예요. 너무 많이 주입하면 컬럼이 과부하되어 피크가 퍼지거나 겹치고, 너무 적게 넣으면 신호가 약해 정확한 적분(면적 계산)이 어려워집니다.' },
+    { title: '4. 런 진행', body: '모든 피크가 나올 때까지 기다려야 해요. 마지막 피크가 나오기 전에 런을 끝내면 데이터가 불완전해 재분석이 필요해지고, 반대로 필요 이상 오래 두면 분석 시간과 시약을 낭비합니다.' },
+    { title: '5. 데이터 리뷰', body: '각 피크의 머무름시간(RT)·높이·면적을 확인하는 단계예요. RT로 어떤 성분인지 식별하고, 면적(적분값)으로 농도를 계산하는 정량 분석의 최종 단계입니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '기준(바탕용액·표준물질)을 먼저 세우고, 시스템을 충분히 안정화한 뒤, 정확한 양을 넣고, 데이터를 끝까지 확보하는 것 — 이 네 가지가 HPLC 정량 분석의 신뢰도를 결정해요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 6) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   function setStep(n) {
     state.step = n;
     var titles = {
@@ -527,6 +588,7 @@
       var active = n === i + 1;
       return (active ? '▶ ' : '   ') + s;
     }).join('\n'));
+    renderManual(n);
   }
 
   function showFeedback(msg, ok) {
@@ -539,6 +601,7 @@
   }
 
   function showResult() {
+    renderManual(6);
     var scene = refs.scene;
     scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
     var grade = state.mistakes === 0 ? 'S — 완벽한 HPLC SOP 수행' : state.mistakes <= 2 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';
