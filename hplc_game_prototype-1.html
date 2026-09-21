@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HPLC 실전 게임 (프로토타입)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #0b1210;
+    color: #e7eeeb;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  .wrap {
+    max-width: 1220px;
+    margin: 20px auto;
+    padding: 0 10px 30px;
+  }
+  h1 {
+    font-size: 19px;
+    margin: 0 0 4px;
+  }
+  .sub {
+    font-size: 13px;
+    color: #93a69f;
+    margin: 0 0 14px;
+    line-height: 1.6;
+  }
+  #gameWrap {
+    position: relative;
+    width: 1200px;
+    max-width: 100%;
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #2a3b35;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.4);
+  }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
+  #injInput {
+    position: absolute;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+    font-size: 16px;
+    background: #0e1815;
+    color: #e7eeeb;
+    border: 1.5px solid #35473f;
+    border-radius: 6px;
+    padding: 0 8px;
+    outline: none;
+  }
+  #injInput:focus { border-color: #4fbfae; }
+  .note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #6b7d76;
+    line-height: 1.7;
+  }
+
+  .devBox {
+    margin-top: 20px;
+    border: 1.5px solid #7a3330;
+    background: #1c1211;
+    border-radius: 10px;
+    padding: 18px 20px 16px;
+    max-width: 1200px;
+  }
+  .devBox .devHead {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14.5px; font-weight: bold; color: #f2a79e; margin: 0 0 4px;
+  }
+  .devBox .devSub {
+    font-size: 11.5px; color: #c99089; line-height: 1.6; margin: 0 0 14px;
+  }
+  .devBox .devList {
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    padding-right: 8px;
+  }
+  .devBox .devList::-webkit-scrollbar { width: 8px; }
+  .devBox .devList::-webkit-scrollbar-thumb { background: #5c3330; border-radius: 4px; }
+  .devBox .devList::-webkit-scrollbar-track { background: #241715; }
+  .devBox .devCase {
+    background: #241715; border: 1px solid #4a2c29; border-radius: 8px; padding: 12px 14px;
+  }
+  .devBox .devCaseTitle {
+    display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+    font-size: 12.5px; font-weight: bold; color: #f4b8b0; margin: 0 0 6px;
+  }
+  .devBox .devSeverity {
+    font-size: 9.5px; font-weight: bold; padding: 1.5px 8px; border-radius: 8px; letter-spacing: 0.2px;
+  }
+  .devBox .devSeverity.major { background: #5c2320; color: #ffb3a8; }
+  .devBox .devSeverity.minor { background: #4a3a1e; color: #e8c37a; }
+  .devBox .devDesc {
+    font-size: 11.8px; color: #d8c3c0; line-height: 1.68; margin: 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📈 HPLC 실전 게임 — 프로토타입</h1>
+  <p class="sub">바탕용액·표준물질·QC 시료·시료 3개를 오토샘플러에 순서대로 로딩하고, 이동상을 평형화한 뒤 주입량을 설정해 표준물질로 시스템 적합성(System Suitability) 런을 진행해보세요. 크로마토그램의 피크가 다 나올 때까지 기다렸다가 적절한 시점에 종료하는 것이 핵심입니다.</p>
+  <div id="gameWrap">
+    <div id="canvasHost">
+      <div id="game"></div>
+      <input id="injInput" type="number" step="1" min="0" max="100" placeholder="µL">
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>📈 HPLC란?</h2>
+      <p class="manualIntro">혼합물 속 성분들을 컬럼 통과 속도 차이로 분리해, 각 성분의 정체(머무름시간)와 농도(피크 면적)를 동시에 확인하는 QC 정량분석의 핵심 장비예요. 원료의약품 순도 시험, 함량 분석 등에 널리 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
+  </div>
+  <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 컬럼 코팅·이동상 조성 최적화 등은 사전에 완료된 상태로 가정했고, 실제 주입량·런타임·피크 모양은 컬럼·성분·장비에 따라 달라지며 이 게임에서는 학습 목적으로 대표적인 범위로 단순화했습니다.</p>
+  <div class="devBox">
+    <p class="devHead">🚨 자주 등장하는 일탈(Deviation) 사례</p>
+    <p class="devSub">HPLC 분석에서 자주 발생하는 일탈 유형으로, 시스템 적합성(SST)과 전처리 관리가 핵심 관리 포인트입니다.</p>
+    <div class="devList">
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 컬럼 평형화 부족 <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">이동상 교체 후 충분히 평형화하지 않고 분석을 시작해 머무름시간(RT)이 런이 진행될수록 계속 밀리는 사례.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 시스템 적합성 시험(SST) 기준 미충족 진행 <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">이론단수·테일링 팩터·재현성 등 SST 기준을 벗어났는데도 그대로 시료 분석을 진행해 전체 데이터가 무효 처리(재시험)된 사례.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 이동상 탈기 미흡 <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">용존 기체 제거(탈기) 단계를 생략해 펌프에 기포가 유입되고 압력이 불안정해져 피크 면적 재현성이 떨어진 사례.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 시료 여과 생략 <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">미세입자를 거르지 않고 바로 주입해 컬럼이 막히거나 시스템 압력이 급상승한 사례. 컬럼 교체 등 비용·시간 손실이 큽니다.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 표준용액 희석 배수 착오 <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">검량선용 표준액을 잘못된 희석 배수로 조제해 정량 결과 전체가 실제보다 왜곡된 사례. 원인 조사(root cause) 시 계산 검증 절차 누락이 흔히 발견됩니다.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 바이알 캡핑 불량 <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">오토샘플러 바이알의 셉텀 캡을 제대로 밀봉하지 않아 용매가 서서히 증발하며 시료 농도가 변한 채로 분석된 사례.</p>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var W = 900, H = 700;
+
+  var COLORS = {
+    bg: 0x0b1210,
+    panel: 0x14201c,
+    line: 0x2a3b35,
+    lineActive: 0x4fbfae,
+    text: 0xe7eeeb,
+    textMuted: 0x93a69f,
+    liquid: 0x3fa9f5,
+    ok: 0x4fbfae,
+    bad: 0xe0735f,
+    warn: 0xd9b564
+  };
+
+  // ---- layout constants ----
+  var PLOT = { x: 130, y: 150, w: 440, h: 230 };
+  var BASELINE_Y = PLOT.y + PLOT.h - 30;
+  var PEAK_SCALE = 165; // px per unit height at scale 1.0
+
+  var SLOT_BASE_X = [190, 260, 330, 400, 470, 540];
+  var SLOT_Y = 470;
+  var TRAY_Y = 605;
+
+  var RUN_MAX = 10;      // minutes, full x-axis width
+  var PEAKS = [
+    { rt: 2.0, height: 0.32, label: '불순물 마커' },
+    { rt: 5.0, height: 1.0, label: '주성분(표준)' },
+    { rt: 7.5, height: 0.25, label: '후용출 피크' }
+  ];
+  var SIGMA = 0.35;
+  var LAST_PEAK_END = 7.5 + 3 * SIGMA; // ~8.55
+
+  var VIALS = [
+    { id: 'blank', label: '바탕\n용액', trayX: SLOT_BASE_X[0], color: 0x8a9a94, correctSlot: 0 },
+    { id: 'std', label: '표준\n물질', trayX: SLOT_BASE_X[1], color: 0x9b8fd9, correctSlot: 1 },
+    { id: 'qc', label: 'QC\n시료', trayX: SLOT_BASE_X[2], color: 0xd9b564, correctSlot: 2 },
+    { id: 'sA', label: '시료A', trayX: SLOT_BASE_X[3], color: 0x3fa9f5, correctSlot: 3 },
+    { id: 'sB', label: '시료B', trayX: SLOT_BASE_X[4], color: 0x3fa9f5, correctSlot: 4 },
+    { id: 'sC', label: '시료C', trayX: SLOT_BASE_X[5], color: 0x3fa9f5, correctSlot: 5 }
+  ];
+
+  var config = {
+    type: Phaser.AUTO,
+    width: W, height: H,
+    backgroundColor: '#0b1210',
+    parent: 'game',
+    scene: { create: create, update: update }
+  };
+
+  var state = {
+    step: 1,
+    vialsPlaced: 0,
+    eqCount: 0,
+    injVolSet: false,
+    injVol: null,
+    running: false,
+    elapsedMin: 0,
+    stoppedManually: false,
+    autoStopped: false,
+    integrated: false,
+    mistakes: 0,
+    done: false
+  };
+
+  var SLOTS = [0, 1, 2, 3, 4, 5].map(function () { return { filled: false, vialId: null }; });
+
+  var refs = {};
+
+  new Phaser.Game(config);
+
+  function getSlotX(i) { return SLOT_BASE_X[i]; }
+
+  function create() {
+    var scene = this;
+    refs.scene = scene;
+
+    refs.stepText = scene.add.text(20, 16, '', { fontSize: '15px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.hintText = scene.add.text(20, 40, '', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 610 } });
+    refs.feedbackText = scene.add.text(20, H - 56, '', { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 620 } });
+    refs.scoreText = scene.add.text(W - 20, 16, '', { fontSize: '12px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(1, 0);
+
+    // ---- chromatogram plot ----
+    scene.add.rectangle(PLOT.x + PLOT.w / 2, PLOT.y + PLOT.h / 2, PLOT.w, PLOT.h, 0x14201c, 1).setStrokeStyle(1, 0x2a3b35);
+    scene.add.text(PLOT.x + PLOT.w / 2, PLOT.y - 16, '크로마토그램 (표준물질 시스템 적합성 런)', { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+    scene.add.line(0, 0, PLOT.x, BASELINE_Y, PLOT.x + PLOT.w, BASELINE_Y, 0x35473f).setOrigin(0);
+
+    var axisLabels = [0, 2, 4, 6, 8, 10];
+    axisLabels.forEach(function (m) {
+      var x = xForTime(m);
+      scene.add.line(0, 0, x, BASELINE_Y, x, BASELINE_Y + 4, 0x35473f).setOrigin(0);
+      scene.add.text(x, BASELINE_Y + 6, m + 'm', { fontSize: '9px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5, 0);
+    });
+
+    refs.traceGfx = scene.add.graphics();
+    refs.peakLabelsGroup = [];
+    refs.timeCursorGfx = scene.add.graphics();
+
+    // ---- autosampler slots ----
+    scene.add.text(PLOT.x + PLOT.w / 2, SLOT_Y - 34, '오토샘플러 트레이', { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+    refs.slotGfx = scene.add.graphics();
+    refs.slotNumTexts = [];
+    var slotLabels = ['1\n(바탕)', '2\n(표준)', '3\n(QC)', '4\n(A)', '5\n(B)', '6\n(C)'];
+    for (var i = 0; i < 6; i++) {
+      refs.slotNumTexts.push(scene.add.text(getSlotX(i), SLOT_Y + 26, slotLabels[i], { fontSize: '9.5px', fontFamily: 'sans-serif', color: '#6b7d76', align: 'center' }).setOrigin(0.5, 0));
+    }
+    drawSlots();
+
+    // ---- vials ----
+    refs.vialObjs = {};
+    VIALS.forEach(function (v) {
+      var g = scene.add.graphics();
+      var label = scene.add.text(0, 0, v.label, { fontSize: '10px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center' }).setOrigin(0.5);
+      var obj = { def: v, x: v.trayX, y: TRAY_Y, gfx: g, label: label, placed: false };
+      refs.vialObjs[v.id] = obj;
+      drawVial(obj);
+
+      var hit = new Phaser.Geom.Rectangle(-16, -30, 32, 60);
+      g.setInteractive(hit, Phaser.Geom.Rectangle.Contains);
+      scene.input.setDraggable(g);
+
+      g.on('drag', function (pointer, dragX, dragY) {
+        obj.x = Phaser.Math.Clamp(dragX, 40, W - 260);
+        obj.y = Phaser.Math.Clamp(dragY, 130, H - 20);
+        drawVial(obj);
+        label.setPosition(obj.x, obj.y - 38);
+      });
+      g.on('dragend', function () {
+        settleVial(obj);
+      });
+    });
+
+    // ---- control panel ----
+    scene.add.rectangle(660, 120, 220, 560, 0x14201c, 1).setOrigin(0, 0).setStrokeStyle(1, 0x2a3b35);
+    scene.add.text(672, 130, '조작 패널', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+
+    scene.add.text(672, 158, '바이알 로딩', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.loadText = scene.add.text(672, 176, '0 / 6 완료', { fontSize: '18px', fontFamily: 'sans-serif', color: '#d9b564', fontStyle: 'bold' });
+
+    scene.add.text(672, 210, '이동상 평형화', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.eqText = scene.add.text(672, 228, '0 / 3 회', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.eqBtn = makeButton(scene, 672, 250, 92, 28, '평형화', doEquilibrate, true);
+    refs.eqNextBtn = makeButton(scene, 770, 250, 96, 28, '다음 단계', finishEquilibrate, true);
+
+    scene.add.text(672, 294, '주입량 설정 (µL, 5~20 권장)', { fontSize: '11px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } });
+    positionInjInput(672, 312, 130, 30);
+    refs.injConfirmBtn = makeButton(scene, 812, 312, 60, 30, '확인', confirmInjVol, true);
+
+    refs.runBtn = makeButton(scene, 672, 354, 195, 34, '▶ 런 시작', startRun, true);
+
+    scene.add.text(672, 406, '경과 시간', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.timeText = scene.add.text(672, 424, '0.0 분', { fontSize: '20px', fontFamily: 'sans-serif', color: '#3fa9f5', fontStyle: 'bold' });
+    refs.stopBtn = makeButton(scene, 672, 458, 195, 34, '■ 런 종료', manualStopRun, true);
+
+    refs.reviewBtn = makeButton(scene, 672, 510, 195, 36, '데이터 리뷰로 이동', goToReview, true);
+
+    scene.add.text(672, 560, '단계 순서', { fontSize: '11px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+    refs.stepListText = scene.add.text(672, 578, '', { fontSize: '9.5px', fontFamily: 'sans-serif', color: '#6b7d76', lineSpacing: 3 });
+
+    setStep(1);
+    updateScore();
+  }
+
+  // ---------- DOM helpers ----------
+
+  function positionInjInput(x, y, w, h) {
+    var input = document.getElementById('injInput');
+    input.style.left = x + 'px';
+    input.style.top = y + 'px';
+    input.style.width = w + 'px';
+    input.style.height = h + 'px';
+  }
+
+  // ---------- drawing helpers ----------
+
+  function xForTime(t) { return PLOT.x + (t / RUN_MAX) * PLOT.w; }
+
+  function drawSlots() {
+    var g = refs.slotGfx;
+    g.clear();
+    g.lineStyle(1.5, 0x35473f, 1);
+    for (var i = 0; i < 6; i++) {
+      var x = getSlotX(i);
+      g.fillStyle(0x0e1815, 1);
+      g.fillRoundedRect(x - 16, SLOT_Y - 16, 32, 32, 4);
+      g.strokeRoundedRect(x - 16, SLOT_Y - 16, 32, 32, 4);
+      if (SLOTS[i].filled) {
+        var v = VIALS.filter(function (vv) { return vv.id === SLOTS[i].vialId; })[0];
+        g.fillStyle(v.color, 0.85);
+        g.fillCircle(x, SLOT_Y, 8);
+      }
+    }
+  }
+
+  function drawVial(obj) {
+    var g = obj.gfx;
+    g.clear();
+    if (obj.placed) { g.setVisible(false); obj.label.setVisible(false); return; }
+    g.setPosition(obj.x, obj.y);
+    g.fillStyle(0xcfd8d4, 1);
+    g.fillRoundedRect(-12, -28, 24, 48, 5);
+    g.lineStyle(1.5, 0x8a9a94, 1);
+    g.strokeRoundedRect(-12, -28, 24, 48, 5);
+    g.fillStyle(obj.def.color, 0.9);
+    g.fillRoundedRect(-8, -4, 16, 20, 3);
+    obj.label.setPosition(obj.x, obj.y - 40);
+  }
+
+  function makeButton(scene, x, y, w, h, label, onClick, block) {
+    var g = scene.add.graphics();
+    g.fillStyle(0x1c2d27, 1);
+    g.fillRoundedRect(0, 0, w, h, 6);
+    g.lineStyle(1.5, 0x35473f, 1);
+    g.strokeRoundedRect(0, 0, w, h, 6);
+    g.setPosition(x, y);
+    var t = scene.add.text(x + w / 2, y + h / 2, label, { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center', wordWrap: { width: w - 8 } }).setOrigin(0.5);
+    var zone = scene.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', function () { onClick(); });
+    return { g: g, t: t, zone: zone, block: block };
+  }
+
+  // ---------- vial / slot logic ----------
+
+  function computeNearestSlot(x, y) {
+    for (var i = 0; i < 6; i++) {
+      var sx = getSlotX(i);
+      if (Math.abs(x - sx) < 26 && Math.abs(y - SLOT_Y) < 26) return i;
+    }
+    return null;
+  }
+
+  function settleVial(obj) {
+    if (state.step !== 1) {
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawVial(obj);
+      return;
+    }
+    var idx = computeNearestSlot(obj.x, obj.y);
+    if (idx === null) {
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawVial(obj);
+      return;
+    }
+    if (SLOTS[idx].filled) {
+      showFeedback('이미 채워진 슬롯입니다. 다른 슬롯을 이용하세요.', false);
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawVial(obj);
+      return;
+    }
+    if (obj.def.correctSlot === idx) {
+      SLOTS[idx].filled = true;
+      SLOTS[idx].vialId = obj.def.id;
+      obj.placed = true;
+      drawVial(obj);
+      drawSlots();
+      state.vialsPlaced++;
+      refs.loadText.setText(state.vialsPlaced + ' / 6 완료');
+      showFeedback(obj.def.label.replace('\n', ' ') + '을(를) ' + (idx + 1) + '번 위치에 정확히 로딩했습니다.', true);
+      if (state.vialsPlaced === 6) {
+        setStep(2);
+      }
+    } else {
+      state.mistakes++;
+      updateScore();
+      showFeedback('분석 시퀀스와 다른 위치입니다 — ' + (obj.def.correctSlot + 1) + '번 위치에 로딩해야 합니다. 순서(바탕용액→표준물질→QC→시료)가 바뀌면 캐리오버·검량선 판정에 문제가 생깁니다.', false);
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawVial(obj);
+    }
+  }
+
+  // ---------- equilibration ----------
+
+  function doEquilibrate() {
+    if (state.step !== 2) return;
+    state.eqCount++;
+    refs.eqText.setText(state.eqCount + ' / 3 회');
+    showFeedback('이동상으로 컬럼을 평형화하는 중입니다 (' + state.eqCount + '회) — 베이스라인이 안정화되고 있습니다.', true);
+  }
+
+  function finishEquilibrate() {
+    if (state.step !== 2) return;
+    if (state.eqCount < 3) {
+      state.mistakes++;
+      updateScore();
+      showFeedback('평형화 횟수가 부족합니다(권장 3회, 현재 ' + state.eqCount + '회) — 베이스라인이 불안정해 머무름시간(RT)이 밀리거나 피크 모양이 나빠질 수 있습니다. 그래도 다음 단계로 진행합니다.', false);
+    } else {
+      showFeedback('평형화가 충분히 이루어졌습니다. 주입량을 설정하세요.', true);
+    }
+    setStep(3);
+  }
+
+  // ---------- injection volume ----------
+
+  function confirmInjVol() {
+    if (state.step !== 3) return;
+    var input = document.getElementById('injInput');
+    var v = parseFloat(input.value);
+    if (isNaN(v) || input.value === '') {
+      showFeedback('주입량을 입력하세요.', false);
+      return;
+    }
+    if (v < 5 || v > 20) {
+      state.mistakes++;
+      updateScore();
+      if (v > 20) {
+        showFeedback(v + 'µL는 너무 많습니다 — 컬럼 과부하로 피크 테일링·분리도 저하가 발생할 수 있습니다. 5~20µL 범위로 다시 설정하세요.', false);
+      } else {
+        showFeedback(v + 'µL는 너무 적습니다 — 신호가 약해 낮은 농도 성분을 검출하기 어려울 수 있습니다. 5~20µL 범위로 다시 설정하세요.', false);
+      }
+      return;
+    }
+    state.injVol = v;
+    state.injVolSet = true;
+    showFeedback(v + 'µL로 설정 완료. "▶ 런 시작"을 누르세요.', true);
+  }
+
+  // ---------- run ----------
+
+  function startRun() {
+    if (state.step !== 3) return;
+    if (!state.injVolSet) {
+      showFeedback('먼저 주입량을 설정하세요 (5~20µL).', false);
+      return;
+    }
+    state.running = true;
+    state.elapsedMin = 0;
+    setStep(4);
+  }
+
+  function update(time, delta) {
+    if (state.step === 4 && state.running) {
+      state.elapsedMin = Math.min(RUN_MAX, state.elapsedMin + (delta / 1000) * 0.9);
+      refs.timeText.setText(state.elapsedMin.toFixed(1) + ' 분');
+      drawTrace();
+      if (state.elapsedMin >= RUN_MAX) {
+        stopRun(true);
+      }
+    }
+  }
+
+  function traceValueAt(t) {
+    var v = 0;
+    PEAKS.forEach(function (p) {
+      v += p.height * Math.exp(-Math.pow(t - p.rt, 2) / (2 * SIGMA * SIGMA));
+    });
+    return v;
+  }
+
+  function drawTrace() {
+    var g = refs.traceGfx;
+    g.clear();
+    g.lineStyle(2, COLORS.lineActive, 1);
+    g.beginPath();
+    var steps = 220;
+    var maxT = state.elapsedMin;
+    for (var i = 0; i <= steps; i++) {
+      var t = (maxT * i) / steps;
+      if (t > maxT) break;
+      var x = xForTime(t);
+      var y = BASELINE_Y - traceValueAt(t) * PEAK_SCALE;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.strokePath();
+
+    g.lineStyle(1, 0xd9b564, 0.7);
+    var cx = xForTime(maxT);
+    g.beginPath();
+    g.moveTo(cx, PLOT.y + 6);
+    g.lineTo(cx, BASELINE_Y);
+    g.strokePath();
+  }
+
+  function manualStopRun() {
+    if (state.step !== 4 || !state.running) return;
+    stopRun(false);
+  }
+
+  function stopRun(auto) {
+    if (auto) {
+      state.running = false;
+      state.autoStopped = true;
+      state.mistakes++;
+      updateScore();
+      showFeedback('런 종료 시점을 직접 판단하지 않아 방법 실행시간이 끝까지 자동 진행되었습니다 — 분석 처리량 관리 측면에서 비효율적입니다.', false);
+      setStep(5);
+      return;
+    }
+    if (state.elapsedMin < LAST_PEAK_END) {
+      state.mistakes += 2;
+      updateScore();
+      showFeedback('아직 마지막 피크가 완전히 용출되지 않았습니다 — 지금 종료하면 데이터가 불완전해 재분석이 필요합니다. 조금 더 기다리세요.', false);
+      state.running = true; // keep running
+      return;
+    }
+    state.running = false;
+    state.stoppedManually = true;
+    showFeedback('적절한 시점(' + state.elapsedMin.toFixed(1) + '분, 모든 피크 용출 확인 후)에 런을 종료했습니다.', true);
+    setStep(5);
+  }
+
+  // ---------- review ----------
+
+  function goToReview() {
+    if (state.step !== 5) return;
+    if (!state.integrated) {
+      state.integrated = true;
+      drawPeakLabels();
+      showFeedback('피크 적분 결과입니다. 머무름시간(RT)과 피크를 확인한 뒤 "결과 등급 확인"을 누르세요.', true);
+      refs.reviewBtn.t.setText('결과 등급 확인');
+      return;
+    }
+    showResult();
+  }
+
+  function drawPeakLabels() {
+    var scene = refs.scene;
+    PEAKS.forEach(function (p) {
+      var x = xForTime(p.rt);
+      var y = BASELINE_Y - p.height * PEAK_SCALE - 14;
+      var t = scene.add.text(x, y, p.label + '\nRT ' + p.rt.toFixed(1) + '분', { fontSize: '9.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center' }).setOrigin(0.5, 1);
+      refs.peakLabelsGroup.push(t);
+    });
+  }
+
+  // ---------- step / UI ----------
+
+  var STEP_LABELS = [
+    '1. 바탕용액·표준물질·QC·시료 로딩',
+    '2. 이동상 평형화',
+    '3. 주입량 설정 (5~20µL)',
+    '4. 런 진행 — 적절한 시점에 종료',
+    '5. 데이터 리뷰 및 결과 확인'
+  ];
+
+  var MANUAL_STEPS = [
+    { title: '1. 바이알 로딩', body: '바탕용액(블랭크)은 컬럼·시스템 자체에 신호가 없는지 확인하는 기준이고, 표준물질은 피크의 머무름시간(RT)·농도를 비교할 기준이에요. 순서가 바뀌면 이전 시료의 잔류(캐리오버)가 다음 분석에 섞여 정량 결과가 왜곡될 수 있습니다.' },
+    { title: '2. 이동상 평형화', body: '컬럼과 이동상을 미리 안정화시키는 단계예요. 평형화가 부족하면 초기 런에서 머무름시간(RT)이 밀리거나 피크 모양이 무너져, 같은 시료라도 분석마다 결과가 달라지는 재현성 문제가 생깁니다.' },
+    { title: '3. 주입량 설정', body: '5~20µL 권장 범위를 지키는 이유예요. 너무 많이 주입하면 컬럼이 과부하되어 피크가 퍼지거나 겹치고, 너무 적게 넣으면 신호가 약해 정확한 적분(면적 계산)이 어려워집니다.' },
+    { title: '4. 런 진행', body: '모든 피크가 나올 때까지 기다려야 해요. 마지막 피크가 나오기 전에 런을 끝내면 데이터가 불완전해 재분석이 필요해지고, 반대로 필요 이상 오래 두면 분석 시간과 시약을 낭비합니다.' },
+    { title: '5. 데이터 리뷰', body: '각 피크의 머무름시간(RT)·높이·면적을 확인하는 단계예요. RT로 어떤 성분인지 식별하고, 면적(적분값)으로 농도를 계산하는 정량 분석의 최종 단계입니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '기준(바탕용액·표준물질)을 먼저 세우고, 시스템을 충분히 안정화한 뒤, 정확한 양을 넣고, 데이터를 끝까지 확보하는 것 — 이 네 가지가 HPLC 정량 분석의 신뢰도를 결정해요.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 6) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function setStep(n) {
+    state.step = n;
+    var titles = {
+      1: '1단계 — 오토샘플러 바이알 로딩',
+      2: '2단계 — 이동상 평형화',
+      3: '3단계 — 주입량 설정',
+      4: '4단계 — 런 진행 중',
+      5: '5단계 — 데이터 리뷰',
+      6: '완료!'
+    };
+    var hints = {
+      1: '바이알을 드래그해서 분석 시퀀스대로 오토샘플러에 넣으세요. 바탕용액 → 표준물질 → QC 시료 → 시료 A/B/C 순서입니다.',
+      2: '오른쪽 "평형화" 버튼을 여러 번 눌러 컬럼과 이동상을 안정화하세요(권장 3회). 충분히 평형화한 뒤 "다음 단계"를 누르세요.',
+      3: '주입량을 입력창에 입력하고 "확인"을 누르세요 (5~20µL 권장). 너무 많으면 컬럼 과부하, 너무 적으면 신호가 약합니다.',
+      4: '표준물질 런이 진행 중입니다. 모든 피크(불순물 마커·주성분·후용출 피크)가 다 나올 때까지 기다렸다가 "■ 런 종료"를 누르세요.',
+      5: '"데이터 리뷰로 이동" 버튼으로 피크 적분 결과를 확인하세요.',
+      6: '아래 결과를 확인하세요.'
+    };
+    refs.stepText.setText(titles[n] || '');
+    refs.hintText.setText(hints[n] || '');
+    refs.stepListText.setText(STEP_LABELS.map(function (s, i) {
+      var active = n === i + 1;
+      return (active ? '▶ ' : '   ') + s;
+    }).join('\n'));
+    renderManual(n);
+  }
+
+  function showFeedback(msg, ok) {
+    refs.feedbackText.setText((ok ? '✓ ' : '⚠ ') + msg);
+    refs.feedbackText.setColor(ok ? '#4fbfae' : '#e0735f');
+  }
+
+  function updateScore() {
+    refs.scoreText.setText('실수 ' + state.mistakes + '회');
+  }
+
+  function showResult() {
+    renderManual(6);
+    var scene = refs.scene;
+    scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
+    var grade = state.mistakes === 0 ? 'S — 완벽한 HPLC SOP 수행' : state.mistakes <= 2 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';
+    var gradeColor = state.mistakes === 0 ? '#4fbfae' : state.mistakes <= 2 ? '#d9b564' : '#e0735f';
+
+    scene.add.rectangle(W / 2, H / 2, 520, 320, 0x14201c, 1).setStrokeStyle(1.5, 0x2a3b35);
+
+    scene.add.text(W / 2, H / 2 - 138, 'HPLC 시스템 적합성 런 완료', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 106, grade, { fontSize: '20px', fontFamily: 'sans-serif', color: gradeColor, fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 76, '실수 횟수: ' + state.mistakes + '회' + (state.autoStopped ? ' (런타임 자동 종료 발생)' : ''), { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(0.5);
+
+    var lines = PEAKS.map(function (p) {
+      var area = (p.height * SIGMA * Math.sqrt(2 * Math.PI)).toFixed(2);
+      return p.label + ' — RT ' + p.rt.toFixed(1) + '분, 높이 ' + p.height.toFixed(2) + ' AU, 면적 ' + area;
+    }).join('\n');
+    scene.add.text(W / 2, H / 2 - 48, lines, { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'left', lineSpacing: 5 }).setOrigin(0.5, 0);
+
+    scene.add.text(W / 2, H / 2 + 92,
+      '로딩 순서·이동상 평형화·주입량·런 종료 타이밍이 모두 결과에 반영됩니다.',
+      { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76', align: 'center' }).setOrigin(0.5, 0);
+
+    makeButton(scene, W / 2 - 90, H / 2 + 122, 180, 34, '다시 하기 (새 배치)', function () {
+      location.reload();
+    }, true);
+  }
+
+})();
+</script>
+</body>
+</html>

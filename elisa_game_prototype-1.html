@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELISA 실전 게임 (프로토타입)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #0b1210;
+    color: #e7eeeb;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  .wrap {
+    max-width: 1220px;
+    margin: 20px auto;
+    padding: 0 10px 30px;
+  }
+  h1 {
+    font-size: 19px;
+    margin: 0 0 4px;
+  }
+  .sub {
+    font-size: 13px;
+    color: #93a69f;
+    margin: 0 0 14px;
+    line-height: 1.6;
+  }
+  #gameWrap {
+    position: relative;
+    width: 1200px;
+    max-width: 100%;
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #2a3b35;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.4);
+  }
+  #canvasHost { position: relative; width: 900px; height: 700px; flex: none; }
+  #manualPanel {
+    width: 300px; height: 700px; flex: none;
+    background: #fbfdfc; color: #33413c;
+    border-left: 1px solid #d8ded9;
+    box-sizing: border-box; padding: 18px 16px;
+    overflow-y: auto;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, sans-serif;
+  }
+  #manualPanel .manualBadge {
+    display: inline-block; font-size: 10px; font-weight: bold; letter-spacing: 0.3px;
+    background: #e4f3ee; color: #1f8f78; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+  }
+  #manualPanel h2 { font-size: 14.5px; margin: 0 0 8px; color: #1c2d27; }
+  #manualPanel .manualIntro { font-size: 11.5px; color: #5a6b64; line-height: 1.6; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px dashed #d8ded9; }
+  #manualPanel .mstepsLabel { font-size: 10.5px; color: #93a69f; font-weight: bold; margin-bottom: 8px; }
+  #manualPanel .mstep { padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid transparent; transition: background 0.2s; }
+  #manualPanel .mstep .mtitle { font-weight: bold; font-size: 12px; color: #7c8a83; }
+  #manualPanel .mstep .mdesc { display: none; margin-top: 6px; font-size: 11.5px; color: #3d4c46; line-height: 1.6; }
+  #manualPanel .mstep.active { background: #eef7f4; border-left-color: #1f8f78; }
+  #manualPanel .mstep.active .mtitle { color: #146b58; }
+  #manualPanel .mstep.active .mdesc { display: block; }
+  #manualPanel .mstep.done .mtitle { color: #93a69f; }
+  #manualPanel .mdoneNote { margin-top: 14px; padding: 12px; background: #eef7f4; border-radius: 7px; font-size: 11.5px; color: #2c463d; line-height: 1.65; }
+  .note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #6b7d76;
+    line-height: 1.7;
+  }
+
+  .devBox {
+    margin-top: 20px;
+    border: 1.5px solid #7a3330;
+    background: #1c1211;
+    border-radius: 10px;
+    padding: 18px 20px 16px;
+    max-width: 1200px;
+  }
+  .devBox .devHead {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14.5px; font-weight: bold; color: #f2a79e; margin: 0 0 4px;
+  }
+  .devBox .devSub {
+    font-size: 11.5px; color: #c99089; line-height: 1.6; margin: 0 0 14px;
+  }
+  .devBox .devList {
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    padding-right: 8px;
+  }
+  .devBox .devList::-webkit-scrollbar { width: 8px; }
+  .devBox .devList::-webkit-scrollbar-thumb { background: #5c3330; border-radius: 4px; }
+  .devBox .devList::-webkit-scrollbar-track { background: #241715; }
+  .devBox .devCase {
+    background: #241715; border: 1px solid #4a2c29; border-radius: 8px; padding: 12px 14px;
+  }
+  .devBox .devCaseTitle {
+    display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+    font-size: 12.5px; font-weight: bold; color: #f4b8b0; margin: 0 0 6px;
+  }
+  .devBox .devSeverity {
+    font-size: 9.5px; font-weight: bold; padding: 1.5px 8px; border-radius: 8px; letter-spacing: 0.2px;
+  }
+  .devBox .devSeverity.major { background: #5c2320; color: #ffb3a8; }
+  .devBox .devSeverity.minor { background: #4a3a1e; color: #e8c37a; }
+  .devBox .devDesc {
+    font-size: 11.8px; color: #d8c3c0; line-height: 1.68; margin: 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧫 ELISA 실전 게임 — 프로토타입</h1>
+  <p class="sub">음성대조군·표준물질 2종·시료 3개를 96웰 스트립에 로딩하고, 세척 → 검출항체 → 세척 → 기질(TMB) 발색까지 실제 순서대로 진행해보세요. 발색을 너무 일찍 멈추거나 너무 오래 두면 결과 판독이 어려워집니다.</p>
+  <div id="gameWrap">
+    <div id="canvasHost">
+      <div id="game"></div>
+    </div>
+    <div id="manualPanel">
+      <div class="manualBadge">📖 학습 설명서</div>
+      <h2>🧫 ELISA란?</h2>
+      <p class="manualIntro">항원-항체 반응과 효소 발색을 이용해, 시료 속 특정 물질의 존재 유무와 농도를 정량적으로 측정하는 QC/QA 핵심 분석법이에요. 신약·백신의 함량 시험, 불순물 검출 등 다양한 곳에 쓰입니다.</p>
+      <div class="mstepsLabel">단계별 의미 (진행에 따라 자동으로 강조돼요)</div>
+      <div id="manualSteps"></div>
+    </div>
+  </div>
+  <p class="note">※ 이 버전은 그림 에셋 없이 도형만으로 조작 로직을 테스트하는 프로토타입입니다. 샌드위치 ELISA(코팅은 사전 완료된 상태로 가정)를 단순화했으며, 실제 세척 횟수·발색 시간·정지 타이밍은 키트·장비에 따라 달라집니다.</p>
+  <div class="devBox">
+    <p class="devHead">🚨 자주 등장하는 일탈(Deviation) 사례</p>
+    <p class="devSub">ELISA 분석에서 반복적으로 보고되는 일탈 유형으로, 대부분 세척·타이밍 관리와 관련이 있습니다.</p>
+    <div class="devList">
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 세척 단계 횟수 부족 <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">정해진 세척 횟수를 채우지 않아 비특이적으로 결합한 항체가 남아 배경(백그라운드) 신호가 높게 나온 사례. 위양성 판정의 주요 원인 중 하나입니다.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 발색 시간 초과(과발색) <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">정지시약 투입이 늦어져 모든 웰이 포화 상태로 발색되어 표준곡선상 구별이 불가능해진 사례. 재시험으로 이어지는 대표적 케이스입니다.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 웰 위치별 온도 편차(Edge effect) <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">플레이트 가장자리와 중앙부의 온도 차이로 인해 동일 농도 시료인데도 웰 위치에 따라 흡광도가 다르게 나타나는 현상. 인큐베이션 전 플레이트 예열로 예방합니다.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 시약 상온 노출시간 초과 <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">냉장 보관해야 하는 시약(효소표지 항체 등)을 상온에 필요 이상 오래 꺼내둬 활성이 저하된 채 사용한 사례.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 분주 소요시간에 따른 반응시간 불균일 <span class="devSeverity minor">경미</span></p>
+          <p class="devDesc">96웰 전체에 시약을 분주하는 데 시간이 오래 걸려, 먼저 분주된 웰과 나중에 분주된 웰의 실제 반응(인큐베이션)시간이 달라진 사례.</p>
+        </div>
+        <div class="devCase">
+          <p class="devCaseTitle">⚠ 대조군 규격 이탈 미확인 <span class="devSeverity major">중대</span></p>
+          <p class="devDesc">음성·양성 대조군 값이 허용범위(assay validity 기준)를 벗어났는데도 이를 확인하지 않고 시료 결과를 그대로 보고한 사례. 데이터 신뢰성 문제로 이어지는 중대한 유형입니다.</p>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var W = 900, H = 700;
+
+  var COLORS = {
+    bg: 0x0b1210,
+    panel: 0x14201c,
+    line: 0x2a3b35,
+    lineActive: 0x4fbfae,
+    text: 0xe7eeeb,
+    textMuted: 0x93a69f,
+    liquid: 0x3fa9f5,
+    ok: 0x4fbfae,
+    bad: 0xe0735f,
+    warn: 0xd9b564
+  };
+
+  // ---- layout constants ----
+  var STRIP = { x: 130, y: 170, w: 440, h: 110 };
+  var WELL_BASE_X = [190, 260, 330, 400, 470, 540];
+  var WELL_Y = 225;
+  var WELL_R = 19;
+  var TRAY_Y = 605;
+
+  var DEV_MS_PER_PCT = 70;   // elapsed(ms) = pct * rate * DEV_MS_PER_PCT... (see pctFor)
+  var GOOD_MIN_PCT = 55;
+  var GOOD_MAX_PCT = 125;
+  var AUTO_CAP_PCT = 145;
+
+  var TUBES = [
+    { id: 'blank', label: '음성\n대조군', trayX: WELL_BASE_X[0], color: 0x8a9a94, rate: 0.03, correctWell: 0 },
+    { id: 'stdH', label: '표준액\n(고농도)', trayX: WELL_BASE_X[1], color: 0x9b8fd9, rate: 1.0, correctWell: 1 },
+    { id: 'stdL', label: '표준액\n(저농도)', trayX: WELL_BASE_X[2], color: 0xd9b564, rate: 0.42, correctWell: 2 },
+    { id: 'sA', label: '시료A', trayX: WELL_BASE_X[3], color: 0x3fa9f5, rate: 0.78, correctWell: 3 },
+    { id: 'sB', label: '시료B', trayX: WELL_BASE_X[4], color: 0x3fa9f5, rate: 0.55, correctWell: 4 },
+    { id: 'sC', label: '시료C', trayX: WELL_BASE_X[5], color: 0x3fa9f5, rate: 0.15, correctWell: 5 }
+  ];
+
+  var config = {
+    type: Phaser.AUTO,
+    width: W, height: H,
+    backgroundColor: '#0b1210',
+    parent: 'game',
+    scene: { create: create, update: update }
+  };
+
+  var state = {
+    step: 1,
+    wellsFilled: 0,
+    wash1Count: 0,
+    wash2Count: 0,
+    detectAdded: false,
+    developing: false,
+    devElapsed: 0,
+    stopped: false,
+    stoppedAuto: false,
+    imaged: false,
+    mistakes: 0,
+    done: false
+  };
+
+  var WELLS = [0, 1, 2, 3, 4, 5].map(function () { return { filled: false, tubeId: null, finalPct: 0 }; });
+
+  var refs = {};
+
+  new Phaser.Game(config);
+
+  function getWellX(i) { return WELL_BASE_X[i]; }
+
+  function create() {
+    var scene = this;
+    refs.scene = scene;
+
+    refs.stepText = scene.add.text(20, 16, '', { fontSize: '15px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.hintText = scene.add.text(20, 40, '', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 610 } });
+    refs.feedbackText = scene.add.text(20, H - 56, '', { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 620 } });
+    refs.scoreText = scene.add.text(W - 20, 16, '', { fontSize: '12px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(1, 0);
+
+    // ---- plate strip holder ----
+    scene.add.rectangle(STRIP.x + STRIP.w / 2, STRIP.y + STRIP.h / 2, STRIP.w, STRIP.h, 0x1c2d27, 0.55).setStrokeStyle(1, 0x2a3b35);
+    scene.add.text(STRIP.x + STRIP.w / 2, STRIP.y - 18, '96웰 플레이트 (8웰 스트립, 6개 사용)', { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76' }).setOrigin(0.5);
+
+    refs.wellNumTexts = [];
+    var wellLabels = ['1\n(대조)', '2\n(표준H)', '3\n(표준L)', '4\n(A)', '5\n(B)', '6\n(C)'];
+    for (var i = 0; i < 6; i++) {
+      refs.wellNumTexts.push(scene.add.text(getWellX(i), WELL_Y + WELL_R + 14, wellLabels[i], { fontSize: '10px', fontFamily: 'sans-serif', color: '#6b7d76', align: 'center' }).setOrigin(0.5, 0));
+    }
+
+    refs.wellGfx = scene.add.graphics();
+    drawWells();
+
+    // ---- tubes ----
+    refs.tubeObjs = {};
+    TUBES.forEach(function (t) {
+      var g = scene.add.graphics();
+      var label = scene.add.text(0, 0, t.label, { fontSize: '10px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center' }).setOrigin(0.5);
+      var obj = { def: t, x: t.trayX, y: TRAY_Y, gfx: g, label: label, placed: false };
+      refs.tubeObjs[t.id] = obj;
+      drawTube(obj);
+
+      var hit = new Phaser.Geom.Rectangle(-16, -32, 32, 64);
+      g.setInteractive(hit, Phaser.Geom.Rectangle.Contains);
+      scene.input.setDraggable(g);
+
+      g.on('drag', function (pointer, dragX, dragY) {
+        obj.x = Phaser.Math.Clamp(dragX, 40, W - 260);
+        obj.y = Phaser.Math.Clamp(dragY, 130, H - 20);
+        drawTube(obj);
+        label.setPosition(obj.x, obj.y - 40);
+      });
+      g.on('dragend', function () {
+        settleTube(obj);
+      });
+    });
+
+    // ---- control panel ----
+    scene.add.rectangle(660, 120, 220, 560, 0x14201c, 1).setOrigin(0, 0).setStrokeStyle(1, 0x2a3b35);
+    scene.add.text(672, 130, '조작 패널', { fontSize: '12.5px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+
+    scene.add.text(672, 158, '웰 로딩', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.loadText = scene.add.text(672, 176, '0 / 6 완료', { fontSize: '18px', fontFamily: 'sans-serif', color: '#d9b564', fontStyle: 'bold' });
+
+    scene.add.text(672, 210, '세척 (1차)', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.wash1Text = scene.add.text(672, 228, '0 / 3 회', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.wash1Btn = makeButton(scene, 672, 250, 92, 28, '세척', function () { doWash(1); }, true);
+    refs.next1Btn = makeButton(scene, 770, 250, 96, 28, '다음 단계', function () { finishWash(1); }, true);
+
+    refs.detectBtn = makeButton(scene, 672, 292, 195, 32, '검출항체(효소표지) 추가', addDetectAb, true);
+
+    scene.add.text(672, 336, '세척 (2차)', { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#93a69f' });
+    refs.wash2Text = scene.add.text(672, 354, '0 / 3 회', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' });
+    refs.wash2Btn = makeButton(scene, 672, 376, 92, 28, '세척', function () { doWash(2); }, true);
+    refs.next2Btn = makeButton(scene, 770, 376, 96, 28, '다음 단계', function () { finishWash(2); }, true);
+
+    refs.substrateBtn = makeButton(scene, 672, 418, 195, 32, '기질(TMB) 추가', addSubstrate, true);
+
+    scene.add.text(672, 462, '발색 진행 (표준H 기준)', { fontSize: '11px', fontFamily: 'sans-serif', color: '#93a69f', wordWrap: { width: 195 } });
+    refs.devText = scene.add.text(672, 480, '0%', { fontSize: '20px', fontFamily: 'sans-serif', color: '#3fa9f5', fontStyle: 'bold' });
+    refs.stopBtn = makeButton(scene, 672, 512, 195, 34, '정지 용액 추가', stopDevelopment, true);
+
+    refs.readerBtn = makeButton(scene, 672, 560, 195, 36, '판독기(플레이트 리더)로 이동', goToReader, true);
+
+    scene.add.text(672, 606, '단계 순서', { fontSize: '11px', fontFamily: 'sans-serif', color: '#4fbfae', fontStyle: 'bold' });
+    refs.stepListText = scene.add.text(672, 624, '', { fontSize: '9.5px', fontFamily: 'sans-serif', color: '#6b7d76', lineSpacing: 3 });
+
+    setStep(1);
+    updateScore();
+  }
+
+  // ---------- drawing helpers ----------
+
+  function lerpColor(c1, c2, t) {
+    t = Phaser.Math.Clamp(t, 0, 1);
+    var r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
+    var r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
+    var r = Math.round(r1 + (r2 - r1) * t);
+    var g = Math.round(g1 + (g2 - g1) * t);
+    var b = Math.round(b1 + (b2 - b1) * t);
+    return (r << 16) | (g << 8) | b;
+  }
+
+  function wellDisplayColor(w) {
+    if (!w.filled) return null;
+    var pale = 0xdfe7e4;
+    if (state.stopped) {
+      var t = Math.min(1, w.finalPct / 100);
+      return lerpColor(pale, 0xe8d44d, t); // TMB + stop solution -> yellow
+    }
+    if (state.developing || w.finalPct > 0) {
+      var t2 = Math.min(1, w.finalPct / 100);
+      return lerpColor(pale, 0x2255cc, t2); // developing TMB -> blue
+    }
+    return pale;
+  }
+
+  function drawWells() {
+    var g = refs.wellGfx;
+    g.clear();
+    for (var i = 0; i < 6; i++) {
+      var x = getWellX(i);
+      var w = WELLS[i];
+      g.lineStyle(1.5, 0x35473f, 1);
+      if (w.filled) {
+        var col = wellDisplayColor(w);
+        g.fillStyle(col, 1);
+      } else {
+        g.fillStyle(0x0e1815, 1);
+      }
+      g.fillCircle(x, WELL_Y, WELL_R);
+      g.strokeCircle(x, WELL_Y, WELL_R);
+      if (w.filled && !state.stopped && w.finalPct > 100) {
+        g.lineStyle(2, 0xe0735f, 0.9);
+        g.strokeCircle(x, WELL_Y, WELL_R + 4);
+      }
+    }
+  }
+
+  function drawTube(obj) {
+    var g = obj.gfx;
+    g.clear();
+    if (obj.placed) { g.setVisible(false); obj.label.setVisible(false); return; }
+    g.setPosition(obj.x, obj.y);
+    g.fillStyle(0xcfd8d4, 1);
+    g.fillRoundedRect(-13, -30, 26, 52, 6);
+    g.lineStyle(1.5, 0x8a9a94, 1);
+    g.strokeRoundedRect(-13, -30, 26, 52, 6);
+    g.fillStyle(obj.def.color, 0.9);
+    g.fillRoundedRect(-9, -6, 18, 24, 3);
+    obj.label.setPosition(obj.x, obj.y - 42);
+  }
+
+  function makeButton(scene, x, y, w, h, label, onClick, block) {
+    var g = scene.add.graphics();
+    g.fillStyle(0x1c2d27, 1);
+    g.fillRoundedRect(0, 0, w, h, 6);
+    g.lineStyle(1.5, 0x35473f, 1);
+    g.strokeRoundedRect(0, 0, w, h, 6);
+    g.setPosition(x, y);
+    var t = scene.add.text(x + w / 2, y + h / 2, label, { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'center', wordWrap: { width: w - 8 } }).setOrigin(0.5);
+    var zone = scene.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', function () { onClick(); });
+    return { g: g, t: t, zone: zone, block: block };
+  }
+
+  // ---------- tube / well logic ----------
+
+  function computeNearestWell(x, y) {
+    for (var i = 0; i < 6; i++) {
+      var wx = getWellX(i);
+      if (Math.abs(x - wx) < WELL_R + 10 && Math.abs(y - WELL_Y) < WELL_R + 12) return i;
+    }
+    return null;
+  }
+
+  function settleTube(obj) {
+    if (state.step !== 1) {
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawTube(obj);
+      return;
+    }
+    var idx = computeNearestWell(obj.x, obj.y);
+    if (idx === null) {
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawTube(obj);
+      return;
+    }
+    if (WELLS[idx].filled) {
+      showFeedback('이미 채워진 웰입니다. 다른 웰을 이용하세요.', false);
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawTube(obj);
+      return;
+    }
+    if (obj.def.correctWell === idx) {
+      WELLS[idx].filled = true;
+      WELLS[idx].tubeId = obj.def.id;
+      obj.placed = true;
+      drawTube(obj);
+      drawWells();
+      state.wellsFilled++;
+      refs.loadText.setText(state.wellsFilled + ' / 6 완료');
+      showFeedback((obj.def.id === 'blank' ? '음성대조군' : obj.def.label.replace('\n', ' ')) + '을(를) ' + (idx + 1) + '번 웰에 정확히 분주했습니다.', true);
+      if (state.wellsFilled === 6) {
+        setStep(2);
+      }
+    } else {
+      state.mistakes++;
+      updateScore();
+      showFeedback('플레이트 맵과 다른 위치입니다 — ' + (obj.def.correctWell + 1) + '번 웰에 분주해야 나중에 표준곡선·시료 순서를 정확히 해석할 수 있습니다.', false);
+      obj.x = obj.def.trayX; obj.y = TRAY_Y;
+      drawTube(obj);
+    }
+  }
+
+  // ---------- washing ----------
+
+  function doWash(phase) {
+    if (state.step !== (phase === 1 ? 2 : 4)) return;
+    if (phase === 1) {
+      state.wash1Count++;
+      refs.wash1Text.setText(state.wash1Count + ' / 3 회');
+      showFeedback('세척 완료 (' + state.wash1Count + '회) — 미결합 물질을 씻어내는 중입니다.', true);
+    } else {
+      state.wash2Count++;
+      refs.wash2Text.setText(state.wash2Count + ' / 3 회');
+      showFeedback('세척 완료 (' + state.wash2Count + '회) — 미결합 검출항체를 씻어내는 중입니다.', true);
+    }
+  }
+
+  function finishWash(phase) {
+    if (state.step !== (phase === 1 ? 2 : 4)) return;
+    var count = phase === 1 ? state.wash1Count : state.wash2Count;
+    if (count < 3) {
+      state.mistakes++;
+      updateScore();
+      showFeedback('세척 횟수가 부족합니다(권장 3회, 현재 ' + count + '회) — 비특이적으로 남은 물질 때문에 배경 신호(백그라운드)가 높아질 수 있습니다. 그래도 다음 단계로 진행합니다.', false);
+    } else {
+      showFeedback('세척이 충분히 이루어졌습니다. 다음 단계로 진행합니다.', true);
+    }
+    setStep(phase === 1 ? 3 : 5);
+  }
+
+  // ---------- detection antibody ----------
+
+  function addDetectAb() {
+    if (state.step !== 3) return;
+    if (state.detectAdded) return;
+    state.detectAdded = true;
+    showFeedback('검출항체(효소표지)를 모든 웰에 추가했습니다. 반응 후 세척으로 넘어가세요.', true);
+    setStep(4);
+  }
+
+  // ---------- substrate / development ----------
+
+  function pctFor(rate, elapsedMs) {
+    return elapsedMs / DEV_MS_PER_PCT * rate;
+  }
+
+  function addSubstrate() {
+    if (state.step !== 5) return;
+    if (state.developing || state.stopped) return;
+    state.developing = true;
+    state.devElapsed = 0;
+    showFeedback('기질(TMB)을 추가했습니다 — 발색이 진행됩니다. 표준H 웰의 색이 짙어지는 것을 지켜보다 적절한 시점에 "정지 용액 추가"를 누르세요.', true);
+    setStep(6);
+  }
+
+  function updateDevelopment(delta) {
+    state.devElapsed += delta;
+    var maxPct = 0;
+    for (var i = 0; i < 6; i++) {
+      var w = WELLS[i];
+      var t = TUBES[i];
+      w.finalPct = pctFor(t.rate, state.devElapsed);
+      if (t.id === 'stdH') maxPct = w.finalPct;
+    }
+    refs.devText.setText(Math.round(maxPct) + '%');
+    drawWells();
+    if (maxPct >= AUTO_CAP_PCT) {
+      stopDevelopment(true);
+    }
+  }
+
+  function stopDevelopment(auto) {
+    if (state.step !== 6 || !state.developing) return;
+    state.developing = false;
+    state.stopped = true;
+    var stdHPct = 0;
+    for (var i = 0; i < 6; i++) { if (TUBES[i].id === 'stdH') stdHPct = WELLS[i].finalPct; }
+
+    if (auto === true) {
+      state.stoppedAuto = true;
+      state.mistakes += 2;
+      updateScore();
+      showFeedback('정지 시점을 놓쳐 반응이 완전히 포화되었습니다 — 고농도 표준액과 시료들이 모두 진한 색으로 뭉쳐 서로 구별할 수 없습니다.', false);
+    } else if (stdHPct < GOOD_MIN_PCT) {
+      state.mistakes++;
+      updateScore();
+      showFeedback('발색이 충분히 진행되지 않았습니다(표준H 기준 약 ' + Math.round(stdHPct) + '%) — 신호가 약해 표준곡선을 그리기 어렵습니다.', false);
+    } else if (stdHPct > GOOD_MAX_PCT) {
+      state.mistakes++;
+      updateScore();
+      showFeedback('발색이 다소 과하게 진행되었습니다(표준H 기준 약 ' + Math.round(stdHPct) + '%) — 고농도 구간의 구별력이 떨어질 수 있습니다.', false);
+    } else {
+      showFeedback('적절한 시점(표준H 기준 약 ' + Math.round(stdHPct) + '%)에 정지 용액을 추가했습니다 — 청색이 노란색으로 바뀝니다.', true);
+    }
+    drawWells();
+    setStep(7);
+  }
+
+  function update(time, delta) {
+    if (state.step === 6 && state.developing) {
+      updateDevelopment(delta);
+    }
+  }
+
+  // ---------- reader ----------
+
+  function goToReader() {
+    if (state.step !== 7) return;
+    if (!state.imaged) {
+      state.imaged = true;
+      showFeedback('플레이트 리더로 옮겼습니다. 각 웰의 최종 색(흡광도)을 확인한 뒤 "결과 등급 확인"을 누르세요.', true);
+      refs.readerBtn.t.setText('결과 등급 확인');
+      return;
+    }
+    showResult();
+  }
+
+  // ---------- step / UI ----------
+
+  var STEP_LABELS = [
+    '1. 대조군·표준액·시료 로딩',
+    '2. 1차 세척',
+    '3. 검출항체(효소표지) 추가',
+    '4. 2차 세척',
+    '5. 기질(TMB) 추가',
+    '6. 발색 관찰 → 정지 용액 추가',
+    '7. 판독기로 결과 확인'
+  ];
+
+  var MANUAL_STEPS = [
+    { title: '1. 대조군·표준액·시료 로딩', body: '음성대조군은 "신호가 없어야 정상"임을 확인하는 기준점이고, 표준물질(농도를 아는 시료)은 나중에 시료의 농도를 환산할 수 있는 검량선의 기준이 돼요. 이 기준들 없이는 시료의 OD값만으로는 농도를 알 수 없습니다.' },
+    { title: '2. 1차 세척', body: '결합하지 않은 항원·불순물을 씻어내는 단계예요. 세척이 부족하면 비특이적 결합 물질이 남아 배경 신호(백그라운드)가 높아져, 실제 신호와 잡음을 구분하기 어려워집니다.' },
+    { title: '3. 검출항체(효소표지) 추가', body: '항원에 결합한 검출항체(효소 부착)가 나중에 기질과 반응해 색을 내는 "신호 발생기" 역할을 해요. 이 항체가 없으면 발색 반응 자체가 일어나지 않습니다.' },
+    { title: '4. 2차 세척', body: '결합하지 않은 검출항체를 씻어내는 단계예요. 여기서도 세척이 부족하면 남은 항체가 배경 신호를 높여 결과의 신뢰도를 떨어뜨립니다.' },
+    { title: '5. 기질(TMB) 추가', body: '효소와 반응해 색을 내는 기질을 넣어 발색을 시작시키는 단계예요. 색의 진하기가 곧 항원 농도(신호)를 눈으로 보여주는 지표가 됩니다.' },
+    { title: '6. 발색 관찰 → 정지', body: '색이 충분히 진해졌을 때 정지 용액을 넣어야 해요. 너무 일찍 멈추면 신호가 약해 구별이 어렵고, 너무 늦으면 모든 웰이 진하게 포화되어 농도 차이를 구별할 수 없게 됩니다. 정확한 타이밍이 정량 분석의 핵심이에요.' },
+    { title: '7. 판독기로 결과 확인', body: '플레이트 리더가 각 웰의 흡광도(OD)를 수치로 읽어내는 단계예요. 이 숫자를 표준물질의 검량선과 비교해 시료의 실제 농도를 계산하게 됩니다.' }
+  ];
+  var MANUAL_DONE_NOTE = '대조군·표준물질을 기준으로 삼고, 두 번의 세척으로 잡음을 걷어내고, 발색을 적절한 타이밍에 멈춰 판독하기까지 — ELISA의 정확도는 "기준을 정하고 → 불필요한 신호를 지우고 → 타이밍을 지키는" 세 원칙에서 나옵니다.';
+
+  function renderManual(n) {
+    var box = document.getElementById('manualSteps');
+    if (!box) return;
+    if (n >= 8) {
+      box.innerHTML = MANUAL_STEPS.map(function (s) {
+        return '<div class="mstep done"><div class="mtitle">✓ ' + s.title + '</div></div>';
+      }).join('') + '<div class="mdoneNote">' + MANUAL_DONE_NOTE + '</div>';
+      return;
+    }
+    box.innerHTML = MANUAL_STEPS.map(function (s, i) {
+      var active = (n === i + 1);
+      return '<div class="mstep' + (active ? ' active' : '') + '">' +
+        '<div class="mtitle">' + s.title + '</div>' +
+        '<div class="mdesc">' + s.body + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function setStep(n) {
+    state.step = n;
+    var titles = {
+      1: '1단계 — 대조군·표준액·시료 로딩',
+      2: '2단계 — 1차 세척',
+      3: '3단계 — 검출항체 추가',
+      4: '4단계 — 2차 세척',
+      5: '5단계 — 기질(TMB) 추가',
+      6: '6단계 — 발색 진행 중',
+      7: '7단계 — 판독',
+      8: '완료!'
+    };
+    var hints = {
+      1: '튜브를 드래그해서 플레이트 맵대로 올바른 웰에 넣으세요. 음성대조군 → 표준액(고→저농도) → 시료 순서입니다.',
+      2: '오른쪽 "세척" 버튼을 여러 번 눌러 미결합 물질을 씻어내세요(권장 3회). 충분히 세척한 뒤 "다음 단계"를 누르세요.',
+      3: '"검출항체(효소표지) 추가" 버튼을 눌러 모든 웰에 검출항체를 넣으세요.',
+      4: '검출항체 반응 후에도 세척이 필요합니다 — "세척" 버튼을 눌러 미결합 항체를 씻어내세요(권장 3회).',
+      5: '"기질(TMB) 추가" 버튼을 눌러 발색 반응을 시작하세요.',
+      6: '표준H 웰(2번)의 색이 짙어지는 것을 지켜보세요. 색이 충분히(하지만 포화되기 전) 짙어졌을 때 "정지 용액 추가"를 누르세요.',
+      7: '"판독기(플레이트 리더)로 이동" 버튼으로 최종 결과를 확인하세요.',
+      8: '아래 결과를 확인하세요.'
+    };
+    refs.stepText.setText(titles[n] || '');
+    refs.hintText.setText(hints[n] || '');
+    refs.stepListText.setText(STEP_LABELS.map(function (s, i) {
+      var active = n === i + 1;
+      return (active ? '▶ ' : '   ') + s;
+    }).join('\n'));
+    renderManual(n);
+  }
+
+  function showFeedback(msg, ok) {
+    refs.feedbackText.setText((ok ? '✓ ' : '⚠ ') + msg);
+    refs.feedbackText.setColor(ok ? '#4fbfae' : '#e0735f');
+  }
+
+  function updateScore() {
+    refs.scoreText.setText('실수 ' + state.mistakes + '회');
+  }
+
+  function odFor(w) {
+    if (state.stoppedAuto && w.finalPct >= 100) return '≥3.00 (포화)';
+    var od = Math.min(3.0, (w.finalPct / 100) * 2.5);
+    return od.toFixed(2);
+  }
+
+  function showResult() {
+    renderManual(8);
+    var scene = refs.scene;
+    var overlay = scene.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0);
+    var grade = state.mistakes === 0 ? 'S — 완벽한 ELISA SOP 수행' : state.mistakes <= 2 ? 'B — 양호, 세부 동작 점검 필요' : 'C — 재도전 권장';
+    var gradeColor = state.mistakes === 0 ? '#4fbfae' : state.mistakes <= 2 ? '#d9b564' : '#e0735f';
+
+    scene.add.rectangle(W / 2, H / 2, 520, 340, 0x14201c, 1).setStrokeStyle(1.5, 0x2a3b35);
+
+    scene.add.text(W / 2, H / 2 - 148, 'ELISA 사이클 완료', { fontSize: '16px', fontFamily: 'sans-serif', color: '#e7eeeb', fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 116, grade, { fontSize: '20px', fontFamily: 'sans-serif', color: gradeColor, fontStyle: 'bold' }).setOrigin(0.5);
+    scene.add.text(W / 2, H / 2 - 86, '실수 횟수: ' + state.mistakes + '회' + (state.stoppedAuto ? ' (발색 포화 발생)' : ''), { fontSize: '13px', fontFamily: 'sans-serif', color: '#93a69f' }).setOrigin(0.5);
+
+    var lines = TUBES.map(function (t, i) {
+      var w = WELLS[i];
+      var name = t.id === 'blank' ? '음성대조군' : t.label.replace('\n', ' ');
+      return (i + 1) + '번 ' + name + ' — OD(450nm) ' + odFor(w);
+    }).join('\n');
+    scene.add.text(W / 2, H / 2 - 58, lines, { fontSize: '11.5px', fontFamily: 'sans-serif', color: '#e7eeeb', align: 'left', lineSpacing: 5 }).setOrigin(0.5, 0);
+
+    scene.add.text(W / 2, H / 2 + 108,
+      '웰 로딩 순서·세척 횟수·발색 정지 타이밍이 모두 결과에 반영됩니다.',
+      { fontSize: '11px', fontFamily: 'sans-serif', color: '#6b7d76', align: 'center' }).setOrigin(0.5, 0);
+
+    makeButton(scene, W / 2 - 90, H / 2 + 138, 180, 34, '다시 하기 (새 배치)', function () {
+      location.reload();
+    }, true);
+  }
+
+})();
+</script>
+</body>
+</html>
